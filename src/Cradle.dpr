@@ -15,6 +15,7 @@ const
 var
   Look: Char;          //Lookahead Character
 
+
 {----------------------Function----------------------------}
 
 { Read New Character From Inpput Stream }
@@ -99,10 +100,18 @@ end;
 
 {-----------Parse and Translate a Math Expression-------------}
 
-{ Parse and Translate a Math Factor }
+procedure Expression; forward;
+
+{ BNF: <factor> ::= (<expression>) }
 procedure Factor;
 begin
-  EmitLn('MOVE #' + GetNum + ',D0');
+  if Look = '(' then begin
+    Match('(');
+    Expression();
+    Match(')');
+  end
+  else
+    EmitLn('MOVE #' + GetNum + ',D0');
 end;
 
 { Recognize and Translate a Multiply }
@@ -168,9 +177,9 @@ begin
 end;
 
 {-----------------------Run---------------------------}
-
 { Main Program }
 begin
   Init;
   Expression;
 end.
+
