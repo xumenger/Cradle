@@ -97,7 +97,7 @@ begin
   GetChar;
 end;
 
-{ Parse and Translate a Math Expression }
+{-----------Parse and Translate a Math Expression-------------}
 
 { Get Term }
 procedure Term;
@@ -119,6 +119,7 @@ begin
   Match('-');
   Term;
   EmitLn('SUB D1, D0');
+  EmitLn('NEG D0');
 end;
 
 { BNF: <term> +/- <term> }
