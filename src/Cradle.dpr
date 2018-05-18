@@ -102,7 +102,7 @@ end;
 { Get Term }
 procedure Term;
 begin
-  EmitLn('Move #' + GetNum + ',D0');
+  EmitLn('MOVE #' + GetNum + ',D0');
 end;
 
 { Recognize and Translate an Add }
@@ -122,15 +122,17 @@ begin
   EmitLn('NEG D0');
 end;
 
-{ BNF: <term> +/- <term> }
+{ BNF: <term> [<addop> <term>]* }
 procedure Expression;
 begin
   Term;
-  EmitLn('Move D0, D1');
-  case Look of
-    '+': Add;
-    '-': Subtract;
-  else Expected('Addop');
+  while Look in['+', '-'] do begin
+    EmitLn('MOVE D0, D1');
+    case Look of
+      '+': Add;
+      '-': Subtract;
+    else Expected('Addop');
+    end;;
   end;
 end;
 
