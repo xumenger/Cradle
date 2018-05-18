@@ -99,10 +99,41 @@ end;
 
 {-----------Parse and Translate a Math Expression-------------}
 
-{ Get Term }
-procedure Term;
+{ Parse and Translate a Math Factor }
+procedure Factor;
 begin
   EmitLn('MOVE #' + GetNum + ',D0');
+end;
+
+{ Recognize and Translate a Multiply }
+procedure Multiply;
+begin
+  Match('*');
+  Factor;
+  EmitLn('MULS (SP)+, D0');
+end;
+
+{ Recognize and Translate a Divide }
+procedure Divide;
+begin
+  Match('/');
+  Factor;
+  EmitLn('MOVE (SP)+, D1');
+  EmitLn('DIVS D1, D0');
+end;
+
+{ BNF: <term> ::= <factor> [<mulop> <factor>]* }
+procedure Term;
+begin
+  Factor;
+  while Look in ['*', '/'] do begin
+    EmitLn('MOVE D0, -(SP)');
+    case Look of
+      '*': Multiply;
+      '/': Divide;
+    else Expected('Mulop');
+    end;
+  end;
 end;
 
 { Recognize and Translate an Add }
@@ -122,7 +153,7 @@ begin
   EmitLn('NEG D0');
 end;
 
-{ BNF: <term> [<addop> <term>]* }
+{ BNF: <expression> ::= <term> [<addop> <term>]* }
 procedure Expression;
 begin
   Term;
