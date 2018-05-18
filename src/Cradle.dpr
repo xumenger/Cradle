@@ -102,6 +102,11 @@ end;
 
 procedure Expression; forward;
 
+function IsAddop(c: Char): Boolean;
+begin
+  IsAddop := c in ['+', '-'];
+end;
+
 { BNF: <factor> ::= (<expression>) }
 procedure Factor;
 begin
@@ -165,8 +170,11 @@ end;
 { BNF: <expression> ::= <term> [<addop> <term>]* }
 procedure Expression;
 begin
-  Term;
-  while Look in['+', '-'] do begin
+  if IsAddop(Look) then
+    EmitLn('CLR D0')
+  else
+    Term;
+  while IsAddop(Look) do begin
     EmitLn('MOVE D0, -(SP)');
     case Look of
       '+': Add;
