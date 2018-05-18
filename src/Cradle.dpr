@@ -110,7 +110,7 @@ procedure Add;
 begin
   Match('+');
   Term;
-  EmitLn('ADD D1, D0');
+  EmitLn('ADD (SP)+, D0');
 end;
 
 { Recognize and Translate a Subtract }
@@ -118,7 +118,7 @@ procedure Subtract;
 begin
   Match('-');
   Term;
-  EmitLn('SUB D1, D0');
+  EmitLn('SUB (SP)+, D0');
   EmitLn('NEG D0');
 end;
 
@@ -127,7 +127,7 @@ procedure Expression;
 begin
   Term;
   while Look in['+', '-'] do begin
-    EmitLn('MOVE D0, D1');
+    EmitLn('MOVE D0, -(SP)');
     case Look of
       '+': Add;
       '-': Subtract;
