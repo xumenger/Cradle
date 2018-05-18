@@ -97,9 +97,16 @@ begin
   GetChar;
 end;
 
+{ Parse and Translate a Math Expression }
+procedure Expression;
+begin
+  EmitLn('Move #' + GetNum + ',D0');
+end;
+
 {-----------------------Run---------------------------}
 
 { Main Program }
 begin
   Init;
+  Expression;
 end.
