@@ -14,7 +14,8 @@ const
 
 { Variable Declarations }
 var
-  Look: Char;          //Lookahead Character
+  Look: Char;                          //Lookahead Character
+  Table: array['A'..'Z'] of Integer;
 
 
 {----------------------Function----------------------------}
@@ -87,18 +88,11 @@ begin
 end;
 
 { Get an Identifier }
-function GetName: string;
-var
-  Token: string;
+function GetName: Char;
 begin
-  Token := '';
   if not IsAlpha(Look) then Expected('Name');
-  while IsAlNum(Look) do begin
-    Token := Token + UpCase(Look);
-    GetChar();
-  end;
-  GetName := Token;
-  SkipWhite();
+  GetName := UpCase(Look);
+  GetChar();
 end;
 
 { Get a Number }
@@ -106,6 +100,7 @@ function GetNum: Integer;
 var
   Value: Integer;
 begin
+  Value := 0;
   if not IsDigit(Look) then Expected('Integer');
   while IsDigit(Look) do begin
     Value := 10 * Value + Ord(Look) - Ord('0');
@@ -143,6 +138,8 @@ begin
     Factor := Expression();
     Match(')');
   end
+  else if IsAlpha(Look) then
+    Factor := Table[GetName()]
   else
     Factor := GetNum();
 end;
@@ -151,16 +148,16 @@ function Term: Integer;
 var
   Value: Integer;
 begin
-  Value := GetNum();
+  Value := Factor();
   while Look in ['*', '/'] do begin
     case Look of
       '*': begin
         Match('*');
-        Value := Value * GetNum();
+        Value := Value * Factor();
       end;
       '/': begin
         Match('/');
-        Value := Value div GetNum();
+        Value := Value div Factor();
       end;
     end;
   end;
@@ -180,11 +177,11 @@ begin
     case Look of
       '+': begin
         Match('+');
-        Value := Value + GetNum();
+        Value := Value + Term();
       end;
       '-': begin
         Match('-');
-        Value := Value - GetNum();
+        Value := Value - Term();
       end;
     end;
   end;
@@ -192,11 +189,28 @@ begin
 end;
 
 {----------------------Initialize--------------------}
+
+{ Initialize the Variable Area
+For the compiler, we had no problem in dealing with variable names ..
+we just issued the names to the assembler and let the rest of the program
+take care of allocating storage for them. Here, on the other hand, we need
+to be able to fetch the values of the variables and return then as the return
+values of Factor. We need a storage mechanism for these variables}
+procedure InitTable;
+var
+  i: Char;
+begin
+  for i := 'A' to 'Z' do
+    Table[i] := 0;
+end;
+
 procedure Init;
 begin
+  InitTable();
   GetChar();
   SkipWhite();
 end;
+
 
 {-----------------------Run---------------------------}
 { Main Program }
