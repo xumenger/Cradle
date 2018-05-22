@@ -10,6 +10,7 @@ uses
 { Constant Declarations }
 const
   TAB = ^I;
+  CR = ^M;
 
 { Variable Declarations }
 var
@@ -112,11 +113,17 @@ procedure Ident;
 var
   Name: Char;
 begin
-  Name = GetName();
-
+  Name := GetName();
+  if Look = '(' then begin
+    Match('(');
+    Match(')');
+    EmitLn('BSR ' + Name);
+  end
+  else
+    EmitLn('MOVE ' + Name + ' (PC),D0');
 end;
 
-{ BNF: <factor> ::= <number> | (<expression>) | <variable> }
+{ BNF: <factor> ::= <number> | (<expression>) | <ident> }
 procedure Factor;
 begin
   if Look = '(' then begin
@@ -125,7 +132,7 @@ begin
     Match(')');
   end
   else if IsAlpha(Look) then
-    EmitLn('MOVE ' + GetName() + '(PC),D0')
+    Ident()
   else
     EmitLn('MOVE #' + GetNum() + ',D0');
 end;
@@ -195,10 +202,25 @@ begin
   end;
 end;
 
+{ Parse and Translate an Assignment Statement }
+{ BNF: <ident> = <expession> }
+procedure Assigned;
+var
+  Name: Char;
+begin
+  Name := GetName();
+  Match('=');
+  Expression();
+  EmitLn('LEA ' + Name + ' (PC),A0');
+  EmitLn('MOVE D0,(A0)');
+end;
+
 {-----------------------Run---------------------------}
 { Main Program }
 begin
-  Init;
-  Expression;
+  Init();
+  //Expression();
+  Assigned();
+  if Look <> CR then Expected('Newline');
 end.
 
