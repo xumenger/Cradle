@@ -103,10 +103,15 @@ end;
 
 { Get a Number }
 function GetNum: Integer;
+var
+  Value: Integer;
 begin
   if not IsDigit(Look) then Expected('Integer');
-  GetNum := Ord(Look) - Ord('0');
-  GetChar();
+  while IsDigit(Look) do begin
+    Value := 10 * Value + Ord(Look) - Ord('0');
+    GetChar();
+  end;
+  GetNum := Value;
 end;
 
 { Output a String with Tab }
@@ -131,10 +136,59 @@ begin
   IsAddop := c in ['+', '-'];
 end;
 
+function Factor: Integer;
+begin
+  if Look = '(' then begin
+    Match('(');
+    Factor := Expression();
+    Match(')');
+  end
+  else
+    Factor := GetNum();
+end;
+
+function Term: Integer;
+var
+  Value: Integer;
+begin
+  Value := GetNum();
+  while Look in ['*', '/'] do begin
+    case Look of
+      '*': begin
+        Match('*');
+        Value := Value * GetNum();
+      end;
+      '/': begin
+        Match('/');
+        Value := Value div GetNum();
+      end;
+    end;
+  end;
+  Term := Value;
+end;
+
 { BNF: <expression> ::= <term> [<addop> <term>]* }
 function Expression: Integer;
+var
+  Value: Integer;
 begin
-  Expression := GetNum();
+  if IsAddop(Look) then
+    Value := 0
+  else
+    Value := Term();
+  while IsAddop(Look) do begin
+    case Look of
+      '+': begin
+        Match('+');
+        Value := Value + GetNum();
+      end;
+      '-': begin
+        Match('-');
+        Value := Value - GetNum();
+      end;
+    end;
+  end;
+  Expression := Value;
 end;
 
 {----------------------Initialize--------------------}
