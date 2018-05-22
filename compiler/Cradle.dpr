@@ -76,6 +76,12 @@ begin
   IsWhite := c in [' ', TAB];
 end;
 
+{ Recognize a Boolean Literal }
+function IsBoolean(c: Char): Boolean;
+begin
+  IsBoolean := UpCase(c) in ['T', 'F'];
+end;
+
 { Skip Over Leading White Space }
 procedure SkipWhite;
 begin
@@ -96,6 +102,14 @@ function GetNum: Char;
 begin
   if not IsDigit(Look) then Expected('Integer');
   GetNum := Look;
+  GetChar();
+end;
+
+{ Get a Boolean Literal }
+function GetBoolean: Boolean;
+begin
+  if not IsBoolean(Look) then Expected('Boolean Literal');
+  GetBoolean := (UpCase(Look) = 'T');
   GetChar();
 end;
 
