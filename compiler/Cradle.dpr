@@ -18,7 +18,7 @@ var
   LCount: Integer;     //Label Counter
 
 
-{----------------------Function----------------------------}
+{--------------------Basic Function-------------------------}
 { Read New Character From Input Stream}
 procedure GetChar;
 begin
@@ -68,6 +68,18 @@ end;
 function IsAddop(c: Char): Boolean;
 begin
   IsAddop := c in ['+', '-'];
+end;
+
+{ Recognize a Boolean Orop }
+function IsOrop(c: Char): Boolean;
+begin
+  IsOrop := c in ['|', '~'];
+end;
+
+{ Recognize a Relop }
+function IsRelop(c: Char): Boolean;
+begin
+  IsRelop := (c in ['=', '#', '<', '>']);
 end;
 
 { Recognize White Space }
@@ -142,16 +154,140 @@ begin
   Writeln;
 end;
 
-{ Parse and Translate a Boolean Condition }
-procedure Condition;
+{-----------------------Bool Expression----------------------}
+procedure Expression; forward;
+
+{ Recognize and Translate a Relational "Equals" }
+procedure Equals;
 begin
-  EmitLn('<condition>');
+  Match('=');
+  Expression();
+  EmitLn('CMP (SP)+,D0');
+  EmitLn('SEQ D0');
 end;
+
+{ Recognize and Translate a Relational "Not Equals" }
+procedure NotEquals;
+begin
+  Match('#');
+  Expression();
+  EmitLn('CMP (SP)+,D0');
+  EmitLn('SNE D0');
+end;
+
+{ Recognize and Translate a Relational "Less Than" }
+procedure Less;
+begin
+  Match('<');
+  Expression();
+  EmitLn('CMP (SP)+,D0');
+  EmitLn('SGE D0');
+end;
+
+{ Recognize and Translate a Relational "Greater Than" }
+procedure Greater;
+begin
+  Match('>');
+  Expression();
+  EmitLn('CMP (SP)+,D0');
+  EmitLn('SLE D0');
+end;
+
+{ Parse and Translate a Relation }
+procedure Relation;
+begin
+  Expression();
+  if IsRelop(Look) then begin
+    EmitLn('MOVE D0,-(SP)');
+    case Look of
+      '=': Equals();
+      '#': NotEquals();
+      '<': Less();
+      '>': Greater();
+    end;
+    EmitLn('TST D0');
+  end;
+end;
+
+{ Parse and Translate a Boolean Factor }
+procedure BoolFactor;
+begin
+  if IsBoolean(Look) then
+    if GetBoolean() then
+      EmitLn('MOVE #-1,D0')
+    else
+      EmitLn('CLR D0')
+    else
+      Relation();
+end;
+
+{ Parse and Translate a Boolean Factor with NOT }
+procedure NotFactor;
+begin
+  if Look = '!' then begin
+    Match('!');
+    BoolFactor();
+    EmitLn('EOR #-1,D0');
+  end
+  else
+    BoolFactor();
+end;
+
+{ Parse and Translate a Boolean Term}
+procedure BoolTerm;
+begin
+  NotFactor();
+  while Look = '&' do begin
+    EmitLn('MOVE D0,-(SP)');
+    Match('&');
+    NotFactor();
+    EmitLn('AND (SP)+,D0');
+  end;
+end;
+
+{Recoginze and Translate a Boolean OR}
+procedure BoolOr;
+begin
+  Match('|');
+  BoolTerm();
+  EmitLn('OR (SP)+,D0');
+end;
+
+{ Recognize and Translate an Exclusive Or }
+procedure BoolXor;
+begin
+  Match('~');
+  BoolTerm();
+  EmitLn('EOR (SP)+,D0');
+end;
+
+{ Parse and Translate a Boolean Expression }
+procedure BoolExpression;
+begin
+  BoolTerm();
+  while IsOrOp(Look) do begin
+    EmitLn('MOVE D0,-(SP)');
+    case Look of
+      '|': BoolOr();
+      '~': BoolXor();
+    end;
+  end;
+end;
+
+{---------------------Arithmetic Expression------------------}
 
 { Parse and Translate a Math Expression }
 procedure Expression;
 begin
   EmitLn('<expr>');
+end;
+
+{-----------------------Logic Construct----------------------}
+
+{ Parse and Translate a Boolean Condition }
+procedure Condition;
+begin
+  EmitLn('<condition>');
 end;
 
 procedure Block(L: string); forward;
@@ -323,7 +459,7 @@ begin
   GetChar();
 end;
 
-{ Main Program }
+{-------------------------Main Program--------------------------}
 begin
   Init();
   DoProgram();
