@@ -10,7 +10,8 @@ uses
 { Constant Declarations }
 const
   TAB = ^I;
-  CR = ^M;
+  CR = #13;
+  LF = #10;
 
 { Variable Declarations }
 var
@@ -152,6 +153,13 @@ procedure EmitLn(s: string);
 begin
   Emit(s);
   Writeln;
+end;
+
+{ Skip a CRLF }
+procedure Fin;
+begin
+  if Look = CR then GetChar();
+  if Look = LF then GetChar();
 end;
 
 {---------------------Arithmetic Expression------------------}
@@ -525,6 +533,7 @@ end;
 procedure Block(L: string);
 begin
   while not (Look in ['e','l','u']) do begin
+    Fin();
     case Look of
       'i': DoIf(L);
       'w': DoWhile();
@@ -536,6 +545,7 @@ begin
     else
       Other();
     end;
+    Fin();
   end;
 end;
 
