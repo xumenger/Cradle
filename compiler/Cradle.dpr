@@ -281,7 +281,27 @@ end;
 { if condition construct
 Pascal: IF <condition> THEN <statement>
 C:      IF (<condition>) <statement>
-Ada:    IF <condition> <block> ENDIF}
+Ada:    IF <condition> <block> [ELSE <block>] ENDIF
+
+
+     <condition>
+     BEQ L1
+     <block>
+     BRA L2
+L1:  <block>
+L2:  ...
+
+
+IF
+<condition>  [ L1 = NewLabel;
+               L2 = NewLabel;
+               Emit(BEQ L1) ]
+<block>
+ELSE         [ Emit(BRA L2);
+               PostLabel(L1)]
+<block>
+ENDIF        [ PostLabel(L2) ]
+}
 
 { Generate a Unique Label }
 function NewLabel: string;
@@ -299,18 +319,28 @@ begin
   Writeln(L, ':');
 end;
 
-{ Recognize and Translate an IF Construct }
+{ Recognize and Translate an IF Construct
+BEQ  <==>  Branch if false
+BNE  <==>  Branch if true}
 procedure DoIf;
 var
-  L: string;
+  L1, L2: string;
 begin
   Match('i');
-  L := NewLabel();
-  Condition;
-  EmitLn('BEQ ' + L);
+  Condition();
+  L1 := NewLabel();
+  L2 := L1;
+  EmitLn('BEQ ' + L1);
   Block();
+  if Look = 'l' then begin
+    Match('l');
+    L2 := NewLabel();
+    EmitLn('BRA ' + L2);
+    PostLabel(L1);
+    Block();
+  end;
   Match('e');
-  PostLabel(L);
+  PostLabel(L2);
 end;
 
 { Parse and Translate a Boolean Condition }
