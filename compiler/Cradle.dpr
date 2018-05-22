@@ -250,6 +250,8 @@ end;
 {-----------------Program Construct-------------------}
 procedure DoIf; forward;
 procedure Condition; forward;
+procedure DoWhile; forward;
+procedure DoLoop; forward;
 
 { Recognize and Translate an "Other" }
 procedure Other;
@@ -261,9 +263,12 @@ end;
 BNF: <block> ::= [<statement>]* }
 procedure Block;
 begin
-  while not (Look in ['e']) do begin
+  while not (Look in ['e', 'l', 'u']) do begin
     case Look of
       'i': DoIf();
+      'w': DoWhile();
+      'p': DoLoop();
+      'r': DoRepeat();
       'o': Other();
     end;
   end;
@@ -347,6 +352,84 @@ end;
 procedure Condition;
 begin
   EmitLn('<condition>');
+end;
+
+{ WHILE <condition> <block> ENDWHILE
+
+L1:  <condition>
+     BEQ L2
+     <block>
+     BRA L1
+L2:
+
+
+WHILE        [ L1 = NewLabel;
+               PostLabel(L1); ]
+<condition>  [ Emit(BEQ L2) ]
+<block>
+ENDWHILE     [ Emit(BRA L1);
+               PostLabel(L2); ]
+}
+
+{ Parse and Translate a WHILE Statement }
+procedure DoWhile;
+var
+  L1, L2: string;
+begin
+  Match('w');
+  L1 := NewLabel();
+  L2 := NewLabel();
+  PostLabel(L1);
+  Condition();
+  EmitLn('BEQ ' + L2);
+  Block();
+  Match('e');
+  EmitLn('BRA ' + L1);
+  PostLabel(L2);
+end;
+
+{ LOOP <block> ENDLOOP
+
+LOOP      [ L= NewLabel;
+            PostLabel(L);]
+<block>
+ENDLOOP   [ Emit(BRA L); ]
+}
+
+{ Parse and Translate a LOOP Statement }
+procedure DoLoop;
+var
+  L: string;
+begin
+  Match('p');
+  L := NewLabel();
+  PostLabel(L);
+  Block();
+  Match('e');
+  EmitLn('BRA ' + L);
+end;  
+
+{ REPEAT <block> UNTIL <condition>
+
+REPEAT       [ L = NewLabel;
+               PostLabel(L); ]
+<block>
+UNTIL
+<condition>  [ Emit(BEQ L) ]
+}
+
+{ Parse and Translate a REPEAT Statement }
+procedure DoRepeat;
+var
+  L: string;
+begin
+  Match('r');
+  L := NewLabel();
+  PostLabel(L);
+  Block();
+  Match('u');
+  Condition();
+  EmitLn('BEQ ' + L);
 end;
 
 {----------------------Initialize--------------------}
