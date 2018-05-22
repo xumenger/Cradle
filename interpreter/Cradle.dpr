@@ -10,8 +10,8 @@ uses
 { Constant Declarations }
 const
   TAB = ^I;
-  CR = ^M;
-  LF = ^$;
+  CR = #13;
+  LF = #10;
 
 { Variable Declarations }
 var
