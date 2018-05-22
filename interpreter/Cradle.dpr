@@ -11,6 +11,7 @@ uses
 const
   TAB = ^I;
   CR = ^M;
+  LF = ^$;
 
 { Variable Declarations }
 var
@@ -122,6 +123,30 @@ begin
   Writeln;
 end;
 
+{ Recoginze and Skip Over a Newline }
+procedure NewLine;
+begin
+  if Look = CR then begin
+    GetChar();
+    if Look = LF then
+      GetChar();
+  end;
+end;
+
+{ Input Routine }
+procedure Input;
+begin
+  Match('?');
+  Read(Table[GetName()]);
+end;
+
+{ Output Routine }
+procedure Output;
+begin
+  Match('!');
+  Writeln(Table[GetName()]);
+end;
+
 {-----------Parse and Translate a Math Expression-------------}
 
 function Expression: Integer; forward;
@@ -188,6 +213,16 @@ begin
   Expression := Value;
 end;
 
+{ Parse and Translate an Assignment Statement }
+procedure Assignment;
+var
+  Name: Char;
+begin
+  Name := GetName();
+  Match('=');
+  Table[Name] := Expression();
+end;
+
 {----------------------Initialize--------------------}
 
 { Initialize the Variable Area
@@ -216,6 +251,13 @@ end;
 { Main Program }
 begin
   Init();
-  Writeln(Expression());
+  repeat
+    case Look of
+      '?': Input();
+      '!': Output();
+    else Assignment;
+    end;
+    NewLine();
+  until Look = '.';
 end.
 
