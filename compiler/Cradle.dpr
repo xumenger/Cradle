@@ -154,8 +154,117 @@ begin
   Writeln;
 end;
 
-{-----------------------Bool Expression----------------------}
+{---------------------Arithmetic Expression------------------}
 procedure Expression; forward;
+
+{ Parse and Translate an Identifier }
+procedure Ident;
+var
+  Name: Char;
+begin
+  Name := GetName();
+  if Look = '(' then begin
+    Match('(');
+    Match(')');
+    EmitLn('BSR ' + Name);
+  end
+  else
+    EmitLn('MOVE ' + Name + '(PC),D0');
+end;
+
+procedure Factor;
+begin
+  if Look = '(' then begin
+    Match('(');
+    Expression();
+    Match(')');
+  end
+  else if IsAlpha(Look) then
+    Ident()
+  else
+    EmitLn('MOVE #' + GetNum + ',D0');
+end;
+
+{ Parse and Translate the First Math Factor }
+procedure SignedFactor;
+begin
+  if Look = '+' then
+    GetChar();
+  if Look = '-' then begin
+    GetChar();
+    if IsDigit(Look) then
+      EmitLn('MOVE #-' + GetNum() + ',D0')
+    else begin
+      Factor();
+      EmitLn('NEG D0');
+    end;
+  end
+  else
+    Factor();
+end;
+
+{ Recognize and Translate a Multiply }
+procedure Multiply;
+begin
+  Match('*');
+  Factor();
+  EmitLn('MULS (SP)+,D0');
+end;
+
+{ Recognize and Translate a Divide }
+procedure Divide;
+begin
+  Match('/');
+  Factor();
+  EmitLn('MOVE (SP)+,D1');
+  EmitLn('EXS.L D0');
+  EmitLn('DIVS D1,D0');
+end;
+
+{ Parse and Translate a Math Term }
+procedure Term;
+begin
+  SignedFactor();
+  while Look in ['*', '/'] do begin
+    EmitLn('MOVE D0,-(SP)');
+    case Look of
+      '*': Multiply();
+      '/': Divide();
+    end;
+  end;
+end;
+
+{ Recognize and Translate Add }
+procedure Add;
+begin
+  Match('+');
+  Term();
+  EmitLn('ADD (SP)+,D0');
+end;
+
+{ Recognize and Translate a Subtract }
+procedure Subtract;
+begin
+  Match('-');
+  Term();
+  EmitLn('SUB (SP)+,D0');
+  EmitLn('NEG D0');
+end;
+
+{ Parse and Translate a Math Expression }
+procedure Expression;
+begin
+  Term();
+  while IsAddop(Look) do begin
+    EmitLn('MOVE D0,-(SP)');
+    case Look of
+      '+': Add();
+      '-': Subtract();
+    end;
+  end;
+end;
+
+{-----------------------Bool Expression----------------------}
 
 { Recognize and Translate a Relational "Equals" }
 procedure Equals;
@@ -217,8 +326,8 @@ begin
       EmitLn('MOVE #-1,D0')
     else
       EmitLn('CLR D0')
-    else
-      Relation();
+  else
+    Relation();
 end;
 
 { Parse and Translate a Boolean Factor with NOT }
@@ -272,14 +381,6 @@ begin
       '~': BoolXor();
     end;
   end;
-end;
-
-{---------------------Arithmetic Expression------------------}
-
-{ Parse and Translate a Math Expression }
-procedure Expression;
-begin
-  EmitLn('<expr>');
 end;
 
 {-----------------------Logic Construct----------------------}
