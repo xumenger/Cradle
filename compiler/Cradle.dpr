@@ -259,6 +259,7 @@ procedure DoWhile; forward;
 procedure DoLoop; forward;
 procedure DoRepeat; forward;
 procedure DoFor; forward;
+procedure Dodo; forward;
 
 { Recognize and Translate an "Other" }
 procedure Other;
@@ -277,6 +278,7 @@ begin
       'p': DoLoop();
       'r': DoRepeat();
       'f': DoFor();
+      'd': Dodo();
       'o': Other();
     end;
   end;
@@ -480,7 +482,34 @@ begin
   EmitLn('BRA ' + L1);
   PostLabel(L2);
   EmitLn('ADDQ #2,SP');
-end;  
+end;
+
+{ DO STATEMENT
+Do
+<expr>      [ Emit(SUBQ #1,D0)];
+              L = NewLabel;
+              PostLabel(L);
+              Emit(MOVE D0, -(SP)]
+<block>
+ENDDO       [ Emit(MOVE (SP)+,D0);
+              Emit(DBRA D0,L)]
+}
+
+{ Parse and Translate a DO Statement }
+procedure Dodo;
+var
+  L: string;
+begin
+  Match('d');
+  L := NewLabel();
+  Expression();
+  EmitLn('SUBQ #1,D0');
+  PostLabel(L);
+  EmitLn('MOVE D0,-(SP)');
+  Block();
+  EmitLn('MOVE (SP)+,D0');
+  EmitLn('DBRA D0,' + L);
+end;
 
 {----------------------Initialize--------------------}
 procedure Init;
