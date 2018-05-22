@@ -150,7 +150,7 @@ begin
     EmitLn('BSR ' + Name);
   end
   else
-    EmitLn('MOVE ' + Name + ' (PC),D0');
+    EmitLn('MOVE ' + Name + '(PC),D0');
 end;
 
 { BNF: <factor> ::= <number> | (<expression>) | <ident> }
@@ -216,6 +216,12 @@ begin
   EmitLn('NEG D0');
 end;
 
+{ Recognize and Translate an "Other" }
+procedure Other;
+begin
+  EmitLn(GetName());
+end;  
+
 { BNF: <expression> ::= <term> [<addop> <term>]* }
 procedure Expression;
 begin
@@ -242,8 +248,27 @@ begin
   Name := GetName();
   Match('=');
   Expression();
-  EmitLn('LEA ' + Name + ' (PC),A0');
+  EmitLn('LEA ' + Name + '(PC),A0');
   EmitLn('MOVE D0,(A0)');
+end;
+
+{-----------------Program Construct-------------------}
+{ Recognize and Translate a Statement Block
+BNF: <block> ::= [<statement>]* }
+procedure Block;
+begin
+  while not (Look in ['e']) do begin
+    Other();
+  end;
+end;
+
+{ Parse and Translate a Program
+BNF: <program> ::= <block> END }
+procedure DoProgram;
+begin
+  Block();
+  if Look <> 'e' then Expected('End');
+  EmitLn('END');
 end;
 
 {----------------------Initialize--------------------}
@@ -257,8 +282,6 @@ end;
 { Main Program }
 begin
   Init();
-  //Expression();
-  Assignment();
-  if Look <> CR then Expected('Newline');
+  DoProgram();
 end.
 
