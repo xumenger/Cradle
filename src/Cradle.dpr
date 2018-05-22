@@ -64,9 +64,20 @@ begin
   IsDigit := c in ['0'..'9'];
 end;
 
-{ Get an Identifier }
-function GetName: Char;
+{ Recognize an Alphanumeric }
+function IsAlNum(c: Char): Boolean;
 begin
+  IsAlNum := IsAlpha(c) or IsDigit(c);
+end;
+
+{ Get an Identifier }
+function GetName: string;
+var
+  Token: string;
+begin
+  Token := '';
+
+
   if not IsAlpha(Look) then Expected('Name');
   GetName := UpCase(Look);
   GetChar;
