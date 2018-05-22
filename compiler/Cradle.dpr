@@ -15,6 +15,7 @@ const
 { Variable Declarations }
 var
   Look: Char;          //Lookahead Character
+  LCount: Integer;     //Label Counter
 
 
 {----------------------Function----------------------------}
@@ -216,12 +217,6 @@ begin
   EmitLn('NEG D0');
 end;
 
-{ Recognize and Translate an "Other" }
-procedure Other;
-begin
-  EmitLn(GetName());
-end;  
-
 { BNF: <expression> ::= <term> [<addop> <term>]* }
 procedure Expression;
 begin
@@ -253,12 +248,24 @@ begin
 end;
 
 {-----------------Program Construct-------------------}
+procedure DoIf; forward;
+procedure Condition; forward;
+
+{ Recognize and Translate an "Other" }
+procedure Other;
+begin
+  EmitLn(GetName());
+end;
+
 { Recognize and Translate a Statement Block
 BNF: <block> ::= [<statement>]* }
 procedure Block;
 begin
   while not (Look in ['e']) do begin
-    Other();
+    case Look of
+      'i': DoIf();
+      'o': Other();
+    end;
   end;
 end;
 
@@ -271,9 +278,51 @@ begin
   EmitLn('END');
 end;
 
+{ if condition construct
+Pascal: IF <condition> THEN <statement>
+C:      IF (<condition>) <statement>
+Ada:    IF <condition> <block> ENDIF}
+
+{ Generate a Unique Label }
+function NewLabel: string;
+var
+  S: string;
+begin
+  Str(LCount, S);
+  NewLabel := 'L' + S;
+  Inc(LCount);
+end;
+
+{ Post a Label To Output}
+procedure PostLabel(L: string);
+begin
+  Writeln(L, ':');
+end;
+
+{ Recognize and Translate an IF Construct }
+procedure DoIf;
+var
+  L: string;
+begin
+  Match('i');
+  L := NewLabel();
+  Condition;
+  EmitLn('BEQ ' + L);
+  Block();
+  Match('e');
+  PostLabel(L);
+end;
+
+{ Parse and Translate a Boolean Condition }
+procedure Condition;
+begin
+  EmitLn('<condition>');
+end;
+
 {----------------------Initialize--------------------}
 procedure Init;
 begin
+  LCount := 0;
   GetChar();
   SkipWhite();
 end;
