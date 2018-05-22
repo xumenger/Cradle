@@ -29,7 +29,7 @@ end;
 procedure Error(s: string);
 begin
   Writeln;
-  Writeln(^G, 'Error: ', s, s, '.');
+  Writeln(^G, 'Error: ', s, '.');
 end;
 
 { Report Error and Halt }
@@ -43,18 +43,6 @@ end;
 procedure Expected(s: string);
 begin
   Abort(s + ' Expected');
-end;
-
-procedure SkipWhite; forward;
-
-{ Match a Specific Input Character }
-procedure Match(x: Char);
-begin
-  if Look <> x then Expected('''' + x + '''')
-  else begin
-    GetChar();
-    SkipWhite();
-  end;
 end;
 
 { Recoginze an Alpha Character }
@@ -86,6 +74,16 @@ procedure SkipWhite;
 begin
   while IsWhite(Look) do
     GetChar();
+end;
+
+{ Match a Specific Input Character }
+procedure Match(x: Char);
+begin
+  if Look <> x then Expected('''' + x + '''')
+  else begin
+    GetChar();
+    SkipWhite();
+  end;
 end;
 
 { Get an Identifier }
@@ -128,14 +126,7 @@ end;
 procedure EmitLn(s: string);
 begin
   Emit(s);
-  Writeln();
-end;
-
-{ Initialize }
-procedure Init;
-begin
-  GetChar();
-  SkipWhite();
+  Writeln;
 end;
 
 {-----------Parse and Translate a Math Expression-------------}
@@ -180,17 +171,18 @@ end;
 procedure Multiply;
 begin
   Match('*');
-  Factor;
-  EmitLn('MULS (SP)+, D0');
+  Factor();
+  EmitLn('MULS (SP)+,D0');
 end;
 
 { Recognize and Translate a Divide }
 procedure Divide;
 begin
   Match('/');
-  Factor;
-  EmitLn('MOVE (SP)+, D1');
-  EmitLn('DIVS D1, D0');
+  Factor();
+  EmitLn('MOVE (SP)+,D1');
+  EmitLn('EXS.L D0');
+  EmitLn('DIVS D1,D0');
 end;
 
 { BNF: <term> ::= <factor> [<mulop> <factor>]* }
@@ -198,11 +190,11 @@ procedure Term;
 begin
   Factor;
   while Look in ['*', '/'] do begin
-    EmitLn('MOVE D0, -(SP)');
+    EmitLn('MOVE D0,-(SP)');
     case Look of
       '*': Multiply;
       '/': Divide;
-    else Expected('Mulop');
+    //else Expected('Mulop');
     end;
   end;
 end;
@@ -212,7 +204,7 @@ procedure Add;
 begin
   Match('+');
   Term;
-  EmitLn('ADD (SP)+, D0');
+  EmitLn('ADD (SP)+,D0');
 end;
 
 { Recognize and Translate a Subtract }
@@ -220,7 +212,7 @@ procedure Subtract;
 begin
   Match('-');
   Term;
-  EmitLn('SUB (SP)+, D0');
+  EmitLn('SUB (SP)+,D0');
   EmitLn('NEG D0');
 end;
 
@@ -232,18 +224,18 @@ begin
   else
     Term;
   while IsAddop(Look) do begin
-    EmitLn('MOVE D0, -(SP)');
+    EmitLn('MOVE D0,-(SP)');
     case Look of
       '+': Add;
       '-': Subtract;
-    else Expected('Addop');
+    //else Expected('Addop');
     end;;
   end;
 end;
 
 { Parse and Translate an Assignment Statement }
 { BNF: <ident> = <expession> }
-procedure Assigned;
+procedure Assignment;
 var
   Name: string;
 begin
@@ -254,12 +246,19 @@ begin
   EmitLn('MOVE D0,(A0)');
 end;
 
+{----------------------Initialize--------------------}
+procedure Init;
+begin
+  GetChar();
+  SkipWhite();
+end;
+
 {-----------------------Run---------------------------}
 { Main Program }
 begin
   Init();
   //Expression();
-  Assigned();
+  Assignment();
   if Look <> CR then Expected('Newline');
 end.
 
