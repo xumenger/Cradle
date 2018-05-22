@@ -107,7 +107,7 @@ begin
   IsAddop := c in ['+', '-'];
 end;
 
-{ BNF: <factor> ::= (<expression>) }
+{ BNF: <factor> ::= <number> | (<expression>) | <variable> }
 procedure Factor;
 begin
   if Look = '(' then begin
