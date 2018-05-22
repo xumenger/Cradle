@@ -97,6 +97,8 @@ begin
   while IsAlNum(Look) do begin
     Token := Token + UpCase(Look);
     GetChar();
+    //
+    Break;
   end;
   GetName := Token;
   SkipWhite();
@@ -220,6 +222,7 @@ end;
 { BNF: <expression> ::= <term> [<addop> <term>]* }
 procedure Expression;
 begin
+  {
   if IsAddop(Look) then
     EmitLn('CLR D0')
   else
@@ -231,7 +234,9 @@ begin
       '-': Subtract;
     //else Expected('Addop');
     end;;
-  end;
+  end; }
+
+  EmitLn('<expr>')
 end;
 
 { Parse and Translate an Assignment Statement }
@@ -252,6 +257,8 @@ procedure DoIf; forward;
 procedure Condition; forward;
 procedure DoWhile; forward;
 procedure DoLoop; forward;
+procedure DoRepeat; forward;
+procedure DoFor; forward;
 
 { Recognize and Translate an "Other" }
 procedure Other;
@@ -269,6 +276,7 @@ begin
       'w': DoWhile();
       'p': DoLoop();
       'r': DoRepeat();
+      'f': DoFor();
       'o': Other();
     end;
   end;
@@ -431,6 +439,48 @@ begin
   Condition();
   EmitLn('BEQ ' + L);
 end;
+
+{ FOR <ident> = <expr1> TO <expr2> <block> ENDFOR
+
+first translate to while
+
+<ident> = <expr1>
+TEMP = <expr2>
+WHILE <ident> <= TEMP
+<block>
+ENDWHILE
+}
+
+{ Parse and Translate a FOR Statement }
+procedure DoFor;
+var
+  L1, L2: string;
+  Name: string;
+begin
+  Match('f');
+  L1 := NewLabel();
+  L2 := NewLabel();
+  Name := GetName();
+  Match('=');
+  Expression();
+  EmitLn('SUBQ #1,D0');
+  EmitLn('LEA ' + Name + '(PC),A0');
+  EmitLn('MOVE D0,(A0)');
+  Expression();
+  EmitLn('MOVE D0,-(SP)');
+  PostLabel(L1);
+  EmitLn('LEA ' + Name + '(PC),A0');
+  EmitLn('MOVE (A0),D0');
+  EmitLn('ADDQ #1,D0');
+  EmitLn('MOVE D0,(A0)');
+  EmitLn('CMP (SP),D0');
+  EmitLn('BGT ' + L2);
+  Block();
+  Match('e');
+  EmitLn('BRA ' + L1);
+  PostLabel(L2);
+  EmitLn('ADDQ #2,SP');
+end;  
 
 {----------------------Initialize--------------------}
 procedure Init;
