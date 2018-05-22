@@ -45,11 +45,16 @@ begin
   Abort(s + ' Expected');
 end;
 
+procedure SkipWhite; forward;
+
 { Match a Specific Input Character }
 procedure Match(x: Char);
 begin
-  if Look = x then GetChar
-  else Expected('''' + x + '''');
+  if Look <> x then Expected('''' + x + '''')
+  else begin
+    GetChar();
+    SkipWhite();
+  end;
 end;
 
 { Recoginze an Alpha Character }
@@ -70,25 +75,47 @@ begin
   IsAlNum := IsAlpha(c) or IsDigit(c);
 end;
 
+{ Recognize White Space }
+function IsWhite(c: Char): Boolean;
+begin
+  IsWhite := c in [' ', TAB];
+end;
+
+{ Skip Over Leading White Space }
+procedure SkipWhite;
+begin
+  while IsWhite(Look) do
+    GetChar();
+end;
+
 { Get an Identifier }
 function GetName: string;
 var
   Token: string;
 begin
   Token := '';
-
-
   if not IsAlpha(Look) then Expected('Name');
-  GetName := UpCase(Look);
-  GetChar;
+  while IsAlNum(Look) do begin
+    Token := Token + UpCase(Look);
+    GetChar();
+  end;
+  GetName := Token;
+  SkipWhite();
 end;
 
 { Get a Number }
-function GetNum: Char;
+function GetNum: string;
+var
+  Value: string;
 begin
+  Value := '';
   if not IsDigit(Look) then Expected('Integer');
-  GetNum := Look;
-  GetChar;
+  while IsDigit(Look) do begin
+    Value := Value + Look;
+    GetChar();
+  end;
+  GetNum := Value;
+  SkipWhite();
 end;
 
 { Output a String with Tab }
@@ -101,13 +128,14 @@ end;
 procedure EmitLn(s: string);
 begin
   Emit(s);
-  Writeln;
+  Writeln();
 end;
 
 { Initialize }
 procedure Init;
 begin
-  GetChar;
+  GetChar();
+  SkipWhite();
 end;
 
 {-----------Parse and Translate a Math Expression-------------}
@@ -122,7 +150,7 @@ end;
 { Parse and Translate an Identifier }
 procedure Ident;
 var
-  Name: Char;
+  Name: string;
 begin
   Name := GetName();
   if Look = '(' then begin
@@ -217,7 +245,7 @@ end;
 { BNF: <ident> = <expession> }
 procedure Assigned;
 var
-  Name: Char;
+  Name: string;
 begin
   Name := GetName();
   Match('=');
