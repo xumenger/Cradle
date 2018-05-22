@@ -385,12 +385,6 @@ end;
 
 {-----------------------Logic Construct----------------------}
 
-{ Parse and Translate a Boolean Condition }
-procedure Condition;
-begin
-  EmitLn('<condition>');
-end;
-
 procedure Block(L: string); forward;
 
 { Recognize and Translate an IF Construct }
@@ -399,7 +393,7 @@ var
   L1, L2: string;
 begin
   Match('i');
-  Condition();
+  BoolExpression();
   L1 := NewLabel();
   L2 := L1;
   EmitLn('BEQ ' + L1);
@@ -424,7 +418,7 @@ begin
   L1 := NewLabel();
   L2 := NewLabel();
   PostLabel(L1);
-  Condition();
+  BoolExpression();
   EmitLn('BEQ ' + L2);
   Block(L2);
   Match('e');
@@ -458,7 +452,7 @@ begin
   PostLabel(L1);
   Block(L2);
   Match('u');
-  Condition();
+  BoolExpression();
   EmitLn('BEQ ' + L1);
   PostLabel(L2);
 end;
