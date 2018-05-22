@@ -107,6 +107,15 @@ begin
   IsAddop := c in ['+', '-'];
 end;
 
+{ Parse and Translate an Identifier }
+procedure Ident;
+var
+  Name: Char;
+begin
+  Name = GetName();
+
+end;
+
 { BNF: <factor> ::= <number> | (<expression>) | <variable> }
 procedure Factor;
 begin
@@ -115,8 +124,10 @@ begin
     Expression();
     Match(')');
   end
+  else if IsAlpha(Look) then
+    EmitLn('MOVE ' + GetName() + '(PC),D0')
   else
-    EmitLn('MOVE #' + GetNum + ',D0');
+    EmitLn('MOVE #' + GetNum() + ',D0');
 end;
 
 { Recognize and Translate a Multiply }
