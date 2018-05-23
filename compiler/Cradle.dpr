@@ -22,7 +22,13 @@ type
 { Variable Declarations }
 var
   Look: Char;            { Lookahead Character }
+  Token: Char;           { Encoded Token }
+  Value: string[16];     { Unencoded Token }
   LCount: Integer;       { Label Counter }
+
+{ Definition of Keywords and Token Types }
+const KWlist: array[1..4] of Symbol = ('IF', 'ELSE', 'ENDIF', 'END');
+const KWcode: string[5] = 'xilee';
 
 {--------------------------------------------------------------}
 { Read New Character from Input Stream }
@@ -110,24 +116,60 @@ begin
   SkipWhite();
 end;
 
+{ Table Lookup }
+function Lookup(T: TabPtr; s: string; n: Integer): Integer;
+var
+  i: Integer;
+  found: Boolean;
+begin
+  found := False;
+  i := n;
+  while(i > 0) and not found do
+    if s = T^[i] then
+      found := True
+    else
+      Dec(i);
+  Lookup := i;
+end;
+
 { Get an Identifier }
-function GetName: Char;
+procedure GetName;
 begin
   while Look = CR do
     Fin();
   if not IsAlpha(Look) then Expected('Name');
-  GetName := UpCase(Look);
-  GetChar();
+  Value := '';
+  while IsAlNum(Look) do begin
+    Value := Value + UpCase(Look);
+    GetChar();
+  end;
   SkipWhite();
 end;
 
 { Get a Number }
-function GetNum: Char;
+procedure GetNum;
 begin
   if not IsDigit(Look) then Expected('Integer');
-  GetNum := Look;
-  GetChar();
+  Value := '';
+  while IsDigit(Look) do begin
+    Value := Value + Look;
+    GetChar();
+  end;
+  Token := '#';
   SkipWhite();
+end;
+
+{ Get an Identifier and Scan it for Keywords }
+procedure Scan;
+begin
+  GetName();
+  Token := KWcode[Lookup(Addr(KWlist), Value, 4) + 1];
+end;
+
+{ Match a Specific Input String }
+procedure MatchString(x: string);
+begin
+  if Value <> x then Expected('''' + x + '''');
 end;
 
 { Generate a Unique Label }
@@ -161,17 +203,15 @@ end;
 
 { Parse and Translate an Identifier }
 procedure Ident;
-var
-  Name: Char;
 begin
-  Name := GetName();
+  GetName();
   if Look = '(' then begin
     Match('(');
     Match(')');
-    EmitLn('BSR ' + Name);
+    EmitLn('BSR ' + Value);
   end
   else
-    EmitLn('MOVE ' + Name + '(PC),D0');
+    EmitLn('MOVE ' + Value + '(PC),D0');
 end;
 
 { Parse and Translate a Math Factor }
@@ -186,8 +226,10 @@ begin
   end
   else if IsAlpha(Look) then
     Ident()
-  else
-    EmitLn('MOVE #' + GetNum() + ',D0');
+  else begin
+    GetNum();
+    EmitLn('MOVE #' + Value + ',D0');
+  end;
 end;
 
 { Parse and Translate the First Math Factor }
@@ -292,29 +334,27 @@ procedure DoIf;
 var
   L1, L2: string;
 begin
-  Match('i');
   Condition();
   L1 := NewLabel();
   L2 := L1;
   EmitLn('BEQ ' + L1);
   Block();
-  if Look = 'l' then begin
-    Match('l');
+  if Token = 'l' then begin
     L2 := NewLabel();
     EmitLn('BRA ' + L2);
     PostLabel(L1);
     Block();
   end;
   PostLabel(L2);
-  Match('e');
+  MatchString('ENDIF');
 end;
 
 { Parse and Translate an Assignment Statement }
 procedure Assignment;
 var
-  Name: Char;
+  Name: string;
 begin
-  Name := GetName();
+  Name := Value;
   Match('=');
   Expression();
   EmitLn('LEA ' + Name + '(PC),A0');
@@ -324,12 +364,13 @@ end;
 { Recognize and Translate a Statement Block }
 procedure Block;
 begin
-  while not (Look in ['e', 'l']) do begin
-    case Look of
+  Scan();
+  while not (Token in ['e', 'l']) do begin
+    case Token of
       'i': DoIf();
-      CR: while Look = CR do Fin();
     else Assignment();
     end;
+    Scan();
   end;
 end;
 
@@ -337,7 +378,7 @@ end;
 procedure DoProgram;
 begin
   Block();
-  if Look <> 'e' then Expected('END');
+  MatchString('END');
   EmitLn('END');
 end;
 
