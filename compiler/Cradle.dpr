@@ -7,33 +7,25 @@ uses
   
 {----------------------Declaration----------------------------}
 
+{ Const Declarations }
+const
+  TAB = ^I;
+  CR = ^M;
+  LF = ^J;
+
 { Type Declarations }
 type
   Symbol = string[8];
   SymTab = array[1..1000] of Symbol;
   TabPtr = ^SymTab;
-  SymType = (IfSym, ElseSym, EndifSym, EndSym, Ident, Number, Operator);
-
-{ Constant Declarations }
-const
-  TAB = ^I;
-  CR = #13;
-  LF = #10;
-  KWList : array[1..4] of Symbol =
-           ('IF', 'ELSE', 'ENDIF', 'END');
-  KWcode : string[5] = 'xilee';
 
 { Variable Declarations }
 var
-  Look: Char;          //Lookahead Character
-  LCount: Integer;     //Label Counter
-  Token: Char;         //Current Token
-  Value: string[16];   //String Token of Look
+  Look: Char;            { Lookahead Character }
+  LCount: Integer;       { Label Counter }
 
-{--------------------Basic Function-------------------------}
-function Lookup(T: TabPtr; s: string; n: Integer): Integer; forward;
-
-{ Read New Character From Input Stream}
+{--------------------------------------------------------------}
+{ Read New Character from Input Stream }
 procedure GetChar;
 begin
   Read(Look);
@@ -59,13 +51,6 @@ begin
   Abort(s + ' Expected');
 end;
 
-{ Match a Specific Input Character }
-procedure Match(x: Char);
-begin
-  if Look = x then GetChar()
-  else Expected('''' + x + '''');
-end;
-
 { Recognize an Alpha Character }
 function IsAlpha(c: Char): Boolean;
 begin
@@ -78,7 +63,7 @@ begin
   IsDigit := c in ['0'..'9'];
 end;
 
-{ Recognize an Alphanumeric Character }
+{ Recognize an AlphaNumeric Character }
 function IsAlNum(c: Char): Boolean;
 begin
   IsAlNum := IsAlpha(c) or IsDigit(c);
@@ -87,37 +72,19 @@ end;
 { Recognize an Addop }
 function IsAddop(c: Char): Boolean;
 begin
-  IsAddop := (c in ['+', '-']);
+  IsAddop := c in ['+', '-'];
 end;
 
-{ Recognize a Boolean Orop }
-function IsOrop(c: Char): Boolean;
+{ Recognize a Mulop }
+function IsMulop(c: Char): Boolean;
 begin
-  IsOrop := (c in ['|', '~']);
-end;
-
-{ Recognize a Relop }
-function IsRelop(c: Char): Boolean;
-begin
-  IsRelop := (c in ['=', '#', '<', '>']);
-end;
-
-{ Recognize Any Operator }
-function IsOp(c: Char): Boolean;
-begin
-  IsOp := (c in ['+', '-', '*', '/', '<', '>', ':', '='])
+  IsMulop := c in ['*', '/'];
 end;
 
 { Recognize White Space }
 function IsWhite(c: Char): Boolean;
 begin
-  IsWhite := (c in [' ', TAB]);
-end;
-
-{ Recognize a Boolean Literal }
-function IsBoolean(c: Char): Boolean;
-begin
-  IsBoolean := (UpCase(c) in ['T', 'F']);
+  IsWhite := c in [' ', TAB];
 end;
 
 { Skip Over Leading White Space }
@@ -127,61 +94,40 @@ begin
     GetChar();
 end;
 
-{ Skip Over a Comma }
-procedure SkipComma;
+{ Match a Specific Input Character }
+procedure Match(x: Char);
 begin
+  if Look <> x then Expected('''' + x + '''');
+  GetChar();
   SkipWhite();
-  if Look = ',' then begin
-    GetChar();
-    SkipWhite();
-  end;
+end;
+
+{ Skip a CRLF }
+procedure Fin;
+begin
+  if Look = CR then GetChar();
+  if Look = LF then GetChar();
+  SkipWhite();
 end;
 
 { Get an Identifier }
-procedure GetName;
+function GetName: Char;
 begin
-  Value := '';
+  while Look = CR do
+    Fin();
   if not IsAlpha(Look) then Expected('Name');
-  while IsAlNum(Look) do begin
-    Value := Value + UpCase(Look);
-    GetChar();
-  end;
-  Token := KWcode[Lookup(Addr(KWlist), Value, 4) + 1];
+  GetName := UpCase(Look);
+  GetChar();
+  SkipWhite();
 end;
 
 { Get a Number }
-procedure GetNum;
+function GetNum: Char;
 begin
-  Value := '';
   if not IsDigit(Look) then Expected('Integer');
-  while IsDigit(Look) do begin
-    Value := Value + Look;
-    GetChar();
-  end;
-  Token := '#';
-end;
-
-{ Get an Operatort }
-procedure GetOp;
-begin
-  Value := '';
-  if not IsOp(Look) then Expected('Operator');
-  while IsOp(Look) do begin
-    Value := Value + Look;
-    GetChar();
-  end;
-  if Length(Value) = 1 then
-    Token := Value[1]
-  else
-    Token := '?';
-end;
-
-{ Get a Boolean Literal }
-function GetBoolean: Boolean;
-begin
-  if not IsBoolean(Look) then Expected('Boolean Literal');
-  GetBoolean := (UpCase(Look) = 'T');
+  GetNum := Look;
   GetChar();
+  SkipWhite();
 end;
 
 { Generate a Unique Label }
@@ -194,16 +140,16 @@ begin
   Inc(LCount);
 end;
 
-{ Post a Label to Output }
+{ Post a Label To Output }
 procedure PostLabel(L: string);
 begin
-  WriteLn(L, ':');
+  Writeln(L, ':');
 end;
 
 { Output a String with Tab }
 procedure Emit(s: string);
 begin
-  Write(TAB, s);
+  Write(Tab, s);
 end;
 
 { Output a String with Tab and CRLF }
@@ -213,22 +159,12 @@ begin
   Writeln;
 end;
 
-{ Skip a CRLF }
-procedure Fin;
-begin
-  if Look = CR then GetChar();
-  if Look = LF then GetChar();
-end;
-
-{---------------------Arithmetic Expression------------------}
-procedure Expression; forward;
-
 { Parse and Translate an Identifier }
-procedure Identifier;
+procedure Ident;
 var
-  Name: string;
+  Name: Char;
 begin
-  //Name := GetName();
+  Name := GetName();
   if Look = '(' then begin
     Match('(');
     Match(')');
@@ -238,6 +174,9 @@ begin
     EmitLn('MOVE ' + Name + '(PC),D0');
 end;
 
+{ Parse and Translate a Math Factor }
+procedure Expression; forward;
+
 procedure Factor;
 begin
   if Look = '(' then begin
@@ -246,27 +185,24 @@ begin
     Match(')');
   end
   else if IsAlpha(Look) then
-    Identifier()
+    Ident()
   else
-  //  EmitLn('MOVE #' + GetNum + ',D0');
+    EmitLn('MOVE #' + GetNum() + ',D0');
 end;
 
 { Parse and Translate the First Math Factor }
 procedure SignedFactor;
+var
+  s: Boolean;
 begin
-  if Look = '+' then
+  s := Look = '-';
+  if IsAddop(Look) then begin
     GetChar();
-  if Look = '-' then begin
-    GetChar();
-    if IsDigit(Look) then
-      //EmitLn('MOVE #-' + GetNum() + ',D0')
-    else begin
-      Factor();
-      EmitLn('NEG D0');
-    end;
-  end
-  else
-    Factor();
+    SkipWhite();
+  end;
+  Factor();
+  if s then
+    EmitLn('NEG D0');
 end;
 
 { Recognize and Translate a Multiply }
@@ -287,11 +223,10 @@ begin
   EmitLn('DIVS D1,D0');
 end;
 
-{ Parse and Translate a Math Term }
-procedure Term;
+{ Completion of Term Processing (called by Term and FirstTerm) }
+procedure Term1;
 begin
-  SignedFactor();
-  while Look in ['*', '/'] do begin
+  while IsMulop(Look) do begin
     EmitLn('MOVE D0,-(SP)');
     case Look of
       '*': Multiply();
@@ -300,7 +235,21 @@ begin
   end;
 end;
 
-{ Recognize and Translate Add }
+{ Parse and Translate a Math Term }
+procedure Term;
+begin
+  Factor();
+  Term1();
+end;
+
+{ Parse and Translate a Math Term with Possible Leading Sign }
+procedure FirstTerm;
+begin
+  SignedFactor();
+  Term1();
+end;
+
+{ Recognize and Translate an Add }
 procedure Add;
 begin
   Match('+');
@@ -317,10 +266,10 @@ begin
   EmitLn('NEG D0');
 end;
 
-{ Parse and Translate a Math Expression }
+{ Parse and Translate an Expression }
 procedure Expression;
 begin
-  Term();
+  FirstTerm();
   while IsAddop(Look) do begin
     EmitLn('MOVE D0,-(SP)');
     case Look of
@@ -330,300 +279,65 @@ begin
   end;
 end;
 
-{-----------------------Bool Expression----------------------}
-
-{ Recognize and Translate a Relational "Equals" }
-procedure Equals;
+{ Parse and Translate a Boolean Condition }
+procedure Condition;
 begin
-  Match('=');
-  Expression();
-  EmitLn('CMP (SP)+,D0');
-  EmitLn('SEQ D0');
-end;
-
-{ Recognize and Translate a Relational "Not Equals" }
-procedure NotEquals;
-begin
-  Match('#');
-  Expression();
-  EmitLn('CMP (SP)+,D0');
-  EmitLn('SNE D0');
-end;
-
-{ Recognize and Translate a Relational "Less Than" }
-procedure Less;
-begin
-  Match('<');
-  Expression();
-  EmitLn('CMP (SP)+,D0');
-  EmitLn('SGE D0');
-end;
-
-{ Recognize and Translate a Relational "Greater Than" }
-procedure Greater;
-begin
-  Match('>');
-  Expression();
-  EmitLn('CMP (SP)+,D0');
-  EmitLn('SLE D0');
-end;
-
-{ Parse and Translate a Relation }
-procedure Relation;
-begin
-  Expression();
-  if IsRelop(Look) then begin
-    EmitLn('MOVE D0,-(SP)');
-    case Look of
-      '=': Equals();
-      '#': NotEquals();
-      '<': Less();
-      '>': Greater();
-    end;
-    EmitLn('TST D0');
-  end;
-end;
-
-{ Parse and Translate a Boolean Factor }
-procedure BoolFactor;
-begin
-  if IsBoolean(Look) then
-    if GetBoolean() then
-      EmitLn('MOVE #-1,D0')
-    else
-      EmitLn('CLR D0')
-  else
-    Relation();
-end;
-
-{ Parse and Translate a Boolean Factor with NOT }
-procedure NotFactor;
-begin
-  if Look = '!' then begin
-    Match('!');
-    BoolFactor();
-    EmitLn('EOR #-1,D0');
-  end
-  else
-    BoolFactor();
-end;
-
-{ Parse and Translate a Boolean Term}
-procedure BoolTerm;
-begin
-  NotFactor();
-  while Look = '&' do begin
-    EmitLn('MOVE D0,-(SP)');
-    Match('&');
-    NotFactor();
-    EmitLn('AND (SP)+,D0');
-  end;
-end;
-
-{Recoginze and Translate a Boolean OR}
-procedure BoolOr;
-begin
-  Match('|');
-  BoolTerm();
-  EmitLn('OR (SP)+,D0');
-end;
-
-{ Recognize and Translate an Exclusive Or }
-procedure BoolXor;
-begin
-  Match('~');
-  BoolTerm();
-  EmitLn('EOR (SP)+,D0');
-end;
-
-{ Parse and Translate a Boolean Expression }
-procedure BoolExpression;
-begin
-  BoolTerm();
-  while IsOrOp(Look) do begin
-    EmitLn('MOVE D0,-(SP)');
-    case Look of
-      '|': BoolOr();
-      '~': BoolXor();
-    end;
-  end;
-end;
-
-{-----------------------Logic Construct----------------------}
-
-procedure Block(L: string); forward;
-
-{ Parse and Translate an Assignment Statement }
-procedure Assignment;
-var
-  Name: string;
-begin
-  //Name := GetName();
-  Match('=');
-  BoolExpression();
-  EmitLn('LEA ' + Name + '(PC),A0');
-  EmitLn('MOVE D0,(A0)');
+  EmitLn('Condition');
 end;
 
 { Recognize and Translate an IF Construct }
-procedure DoIf(L: string);
+procedure Block; forward;
+
+procedure DoIf;
 var
   L1, L2: string;
 begin
   Match('i');
-  BoolExpression();
+  Condition();
   L1 := NewLabel();
   L2 := L1;
   EmitLn('BEQ ' + L1);
-  Block(L);
+  Block();
   if Look = 'l' then begin
     Match('l');
     L2 := NewLabel();
     EmitLn('BRA ' + L2);
     PostLabel(L1);
-    Block(L);
+    Block();
   end;
+  PostLabel(L2);
   Match('e');
-  PostLabel(L2);
 end;
 
-{ Parse and Translate a WHILE Statement }
-procedure DoWhile;
+{ Parse and Translate an Assignment Statement }
+procedure Assignment;
 var
-  L1, L2: string;
+  Name: Char;
 begin
-  Match('w');
-  L1 := NewLabel();
-  L2 := NewLabel();
-  PostLabel(L1);
-  BoolExpression();
-  EmitLn('BEQ ' + L2);
-  Block(L2);
-  Match('e');
-  EmitLn('BRA ' + L1);
-  PostLabel(L2);
-end;
-
-{ Parse and Translate a LOOP Statement }
-procedure DoLoop;
-var
-  L1, L2: string;
-begin
-  Match('p');
-  L1 := NewLabel();
-  L2 := NewLabel();
-  PostLabel(L1);
-  Block(L2);
-  Match('e');
-  EmitLn('BRA ' + L1);
-  PostLabel(L2);
-end;
-
-{ Parse and Translate a REPEAT Statement }
-procedure DoRepeat;
-var
-  L1, L2: string;
-begin
-  Match('r');
-  L1 := NewLabel();
-  L2 := NewLabel();
-  PostLabel(L1);
-  Block(L2);
-  Match('u');
-  BoolExpression();
-  EmitLn('BEQ ' + L1);
-  PostLabel(L2);
-end;
-
-{ Parse and Translate a FOR Statement }
-procedure DoFor;
-var
-  L1, L2: string;
-  Name: string;
-begin
-  Match('f');
-  L1 := NewLabel();
-  L2 := NewLabel();
-  //Name := GetName();
+  Name := GetName();
   Match('=');
   Expression();
-  EmitLn('SUB! #1,D0');
   EmitLn('LEA ' + Name + '(PC),A0');
   EmitLn('MOVE D0,(A0)');
-  Expression();
-  EmitLn('MOVE D0,-(SP)');
-  PostLabel(L1);
-  EmitLn('LEA ' + Name + '(PC),A0');
-  EmitLn('MOVE (A0),D0');
-  EmitLn('ADDQ #1,D0');
-  EmitLn('MOVE D0,(A0)');
-  EmitLn('CMP (SP),D0');
-  EmitLn('BGT ' + L2);
-  Block(L2);
-  Match('e');
-  EmitLn('BRA ' + L1);
-  PostLabel(L2);
-  EmitLn('ADDQ #2,SP');
-end;
-
-{ Parse and Translate a DO Statement }
-procedure DoDo;
-var
-  L1, L2: string;
-begin
-  Match('d');
-  L1 := NewLabel();
-  L2 := NewLabel();
-  Expression();
-  EmitLn('SUBQ #1,D0');
-  PostLabel(L1);
-  EmitLn('MOVE D0,-(SP)');
-  Block(L2);
-  EmitLn('MOVE (SP)+,D0');
-  EmitLn('DBRA D0,' + L1);
-  EmitLn('SUBQ #2,SP');
-  PostLabel(L2);
-  EmitLn('ADDQ #2,SP');
-end;
-
-{ Recognize and Translate a BREAK }
-procedure DoBreak(L: string);
-begin
-  Match('b');
-  EmitLn('BRA ' + L);
-end;
-
-{ Recognize and Translate an "Other" }
-procedure Other;
-begin
-  //EmitLn(GetName());
 end;
 
 { Recognize and Translate a Statement Block }
-procedure Block(L: string);
+procedure Block;
 begin
-  while not (Look in ['e','l','u']) do begin
-    Fin();
+  while not (Look in ['e', 'l']) do begin
     case Look of
-      'i': DoIf(L);
-      'w': DoWhile();
-      'p': DoLoop();
-      'r': DoRepeat();
-      'f': DoFor();
-      'd': DoDo();
-      'b': DoBreak(L);
-    else
-      Other();
+      'i': DoIf();
+      CR: while Look = CR do Fin();
+    else Assignment();
     end;
-    Fin();
   end;
 end;
 
 { Parse and Translate a Program }
 procedure DoProgram;
 begin
-  Block('');
-  if Look <> 'e' then Expected('End');
+  Block();
+  if Look <> 'e' then Expected('END');
   EmitLn('END');
 end;
 
@@ -634,60 +348,8 @@ begin
   GetChar();
 end;
 
-{--------------------------Lexical Scanner----------------------}
-
-{ Table Loopup
-If the input string matches a table entry, return the entry index. If not, return a zero }
-function Lookup(T: TabPtr; s: string; n: Integer): Integer;
-var
-  i: Integer;
-  found: Boolean;
-begin
-  found := False;
-  i := n;
-  while(i>0) and not found do
-    if s = T^[i] then
-      found := True
-    else
-      Dec(i);
-  Lookup := i;
-end;
-
-{ Lexical Scanner }
-procedure Scan;
-var
-  k: Integer;
-begin
-  while Look = CR do
-    Fin();
-
-  if IsAlpha(Look) then
-    GetName()
-  else if IsDigit(Look) then
-    GetNum()
-  else if IsOp(Look) then
-    GetOp()
-  else begin
-    Value := Look;
-    Token := '?';
-    GetChar();
-  end;
-  SkipWhite();
-end;
-
-{-------------------------Main Program--------------------------}
+{ Main Program }
 begin
   Init();
-  {
-  repeat
-    Scan();
-    case Token of
-      Ident: Write('Ident ');
-      Number: Write('Number ');
-      Operator: Write('Operator');
-      IfSym, ElseSym, EndifSym, EndSym: Write('Keyword ');
-    end;
-    Writeln(Value);
-  until Token = EndSym;
-  }
+  DoProgram();
 end.
