@@ -12,6 +12,7 @@ type
   Symbol = string[8];
   SymTab = array[1..1000] of Symbol;
   TabPtr = ^SymTab;
+  SymType = (IfSym, ElseSym, EndifSym, EndSym, Ident, Number, Operator);
 
 { Constant Declarations }
 const
@@ -25,7 +26,8 @@ const
 var
   Look: Char;          //Lookahead Character
   LCount: Integer;     //Label Counter
-  Token: string[16];
+  Token: SymType;      //Current Token
+  Value: string[16];   //String Token of Look
 
 {--------------------Basic Function-------------------------}
 { Read New Character From Input Stream}
@@ -220,7 +222,7 @@ end;
 procedure Expression; forward;
 
 { Parse and Translate an Identifier }
-procedure Ident;
+procedure Identifier;
 var
   Name: string;
 begin
@@ -242,7 +244,7 @@ begin
     Match(')');
   end
   else if IsAlpha(Look) then
-    Ident()
+    Identifier()
   else
     EmitLn('MOVE #' + GetNum + ',D0');
 end;
@@ -632,25 +634,6 @@ end;
 
 {--------------------------Lexical Scanner----------------------}
 
-{ Lexical Scanner }
-function Scan: string;
-begin
-  while Look = CR do
-    Fin();
-    
-  if IsAlpha(Look) then
-    Scan := GetName()
-  else if IsDigit(Look) then
-    Scan := GetNum()
-  else if IsOp(Look) then
-    Scan := GetOp()
-  else begin
-    Scan := Look;
-    GetChar();
-  end;
-  SkipWhite();
-end;
-
 { Table Loopup
 If the input string matches a table entry, return the entry index. If not, return a zero }
 function Lookup(T: TabPtr; s: string; n: Integer): Integer;
@@ -668,8 +651,49 @@ begin
   Lookup := i;
 end;
 
+{ Lexical Scanner }
+procedure Scan;
+var
+  k: Integer;
+begin
+  while Look = CR do
+    Fin();
+    
+  if IsAlpha(Look) then begin
+    Value := GetName();
+    k := Lookup(Addr(KWList), Value, 4);
+    if k = 0 then
+      Token := Ident
+    else
+      Token := SymType(k-1);
+  end
+  else if IsDigit(Look) then begin
+    Value := GetNum();
+    Token := Number;
+  end
+  else if IsOp(Look) then begin
+    Value := GetOp();
+    Token := Operator;
+  end
+  else begin
+    Value := Look;
+    Token := Operator;
+    GetChar();
+  end;
+  SkipWhite();
+end;
+
 {-------------------------Main Program--------------------------}
 begin
-  ReadLn(Token);
-  Writeln(Lookup(Addr(KWList), Token, 4));
+  Init();
+  repeat
+    Scan();
+    case Token of
+      Ident: Write('Ident ');
+      Number: Write('Number ');
+      Operator: Write('Operator');
+      IfSym, ElseSym, EndifSym, EndSym: Write('Keyword ');
+    end;
+    Writeln(Value);
+  until Token = EndSym;
 end.
