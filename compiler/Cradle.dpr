@@ -30,6 +30,8 @@ var
   Value: string[16];   //String Token of Look
 
 {--------------------Basic Function-------------------------}
+function Lookup(T: TabPtr; s: string; n: Integer): Integer; forward;
+
 { Read New Character From Input Stream}
 procedure GetChar;
 begin
@@ -135,43 +137,45 @@ begin
 end;
 
 { Get an Identifier }
-function GetName: string;
+procedure GetName;
 var
-  x: string[8];
+  k: Integer;
 begin
-  x := '';
+  Value := '';
   if not IsAlpha(Look) then Expected('Name');
   while IsAlNum(Look) do begin
-    x := x + UpCase(Look);
+    Value := Value + UpCase(Look);
     GetChar();
   end;
-  GetName := x;
+  k := Lookup(Addr(KWList), Value, 4);
+  if k = 0 then
+    Token := Ident
+  else
+    Token := SymType(k-1);
 end;
 
 { Get a Number }
-function GetNum: string;
-var
-  x: string[16];
+procedure GetNum;
 begin
-  x := '';
+  Value := '';
   if not IsDigit(Look) then Expected('Integer');
   while IsDigit(Look) do begin
-    x := x + Look;
+    Value := Value + Look;
     GetChar();
   end;
-  GetNum := x;
+  Token := Number;
 end;
 
 { Get an Operatort }
-function GetOp: string;
-var
-  x: string[1];
+procedure GetOp;
 begin
-  x := '';
+  Value := '';
   if not IsOp(Look) then Expected('Operator');
-  x := x + Look;
-  GetChar();
-  GetOp := x;
+  while IsOp(Look) do begin
+    Value := Value + Look;
+    GetChar();
+  end;
+  Token := Operator;
 end;
 
 { Get a Boolean Literal }
@@ -226,7 +230,7 @@ procedure Identifier;
 var
   Name: string;
 begin
-  Name := GetName();
+  //Name := GetName();
   if Look = '(' then begin
     Match('(');
     Match(')');
@@ -246,7 +250,7 @@ begin
   else if IsAlpha(Look) then
     Identifier()
   else
-    EmitLn('MOVE #' + GetNum + ',D0');
+  //  EmitLn('MOVE #' + GetNum + ',D0');
 end;
 
 { Parse and Translate the First Math Factor }
@@ -257,7 +261,7 @@ begin
   if Look = '-' then begin
     GetChar();
     if IsDigit(Look) then
-      EmitLn('MOVE #-' + GetNum() + ',D0')
+      //EmitLn('MOVE #-' + GetNum() + ',D0')
     else begin
       Factor();
       EmitLn('NEG D0');
@@ -456,7 +460,7 @@ procedure Assignment;
 var
   Name: string;
 begin
-  Name := GetName();
+  //Name := GetName();
   Match('=');
   BoolExpression();
   EmitLn('LEA ' + Name + '(PC),A0');
@@ -542,7 +546,7 @@ begin
   Match('f');
   L1 := NewLabel();
   L2 := NewLabel();
-  Name := GetName();
+  //Name := GetName();
   Match('=');
   Expression();
   EmitLn('SUB! #1,D0');
@@ -594,7 +598,7 @@ end;
 { Recognize and Translate an "Other" }
 procedure Other;
 begin
-  EmitLn(GetName());
+  //EmitLn(GetName());
 end;
 
 { Recognize and Translate a Statement Block }
@@ -658,23 +662,13 @@ var
 begin
   while Look = CR do
     Fin();
-    
-  if IsAlpha(Look) then begin
-    Value := GetName();
-    k := Lookup(Addr(KWList), Value, 4);
-    if k = 0 then
-      Token := Ident
-    else
-      Token := SymType(k-1);
-  end
-  else if IsDigit(Look) then begin
-    Value := GetNum();
-    Token := Number;
-  end
-  else if IsOp(Look) then begin
-    Value := GetOp();
-    Token := Operator;
-  end
+
+  if IsAlpha(Look) then
+    GetName()
+  else if IsDigit(Look) then
+    GetNum()
+  else if IsOp(Look) then
+    GetOp()
   else begin
     Value := Look;
     Token := Operator;
