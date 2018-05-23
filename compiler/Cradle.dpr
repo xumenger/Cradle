@@ -75,13 +75,13 @@ end;
 { Recognize an Addop }
 function IsAddop(c: Char): Boolean;
 begin
-  IsAddop := c in ['+', '-'];
+  IsAddop := (c in ['+', '-']);
 end;
 
 { Recognize a Boolean Orop }
 function IsOrop(c: Char): Boolean;
 begin
-  IsOrop := c in ['|', '~'];
+  IsOrop := (c in ['|', '~']);
 end;
 
 { Recognize a Relop }
@@ -90,16 +90,22 @@ begin
   IsRelop := (c in ['=', '#', '<', '>']);
 end;
 
+{ Recognize Any Operator }
+function IsOp(c: Char): Boolean;
+begin
+  IsOp := (c in ['+', '-', '*', '/', '<', '>', ':', '='])
+end;
+
 { Recognize White Space }
 function IsWhite(c: Char): Boolean;
 begin
-  IsWhite := c in [' ', TAB];
+  IsWhite := (c in [' ', TAB]);
 end;
 
 { Recognize a Boolean Literal }
 function IsBoolean(c: Char): Boolean;
 begin
-  IsBoolean := UpCase(c) in ['T', 'F'];
+  IsBoolean := (UpCase(c) in ['T', 'F']);
 end;
 
 { Skip Over Leading White Space }
@@ -135,6 +141,18 @@ begin
     GetChar();
   end;
   GetNum := x;
+end;
+
+{ Get an Operatort }
+function GetOp: string;
+var
+  x: string[1];
+begin
+  x := '';
+  if not IsOp(Look) then Expected('Operator');
+  x := x + Look;
+  GetChar();
+  GetOp := x;
 end;
 
 { Get a Boolean Literal }
@@ -599,10 +617,15 @@ end;
 { Lexical Scanner }
 function Scan: string;
 begin
+  while Look = CR do
+    Fin();
+    
   if IsAlpha(Look) then
     Scan := GetName()
   else if IsDigit(Look) then
     Scan := GetNum()
+  else if IsOp(Look) then
+    Scan := GetOp()
   else begin
     Scan := Look;
     GetChar();
