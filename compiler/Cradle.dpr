@@ -17,7 +17,7 @@ const
 var
   Look: Char;          //Lookahead Character
   LCount: Integer;     //Label Counter
-  Token: string;
+  Token: string[16];
 
 
 {--------------------Basic Function-------------------------}
@@ -616,5 +616,6 @@ begin
   repeat
     Token := Scan;
     Writeln(Token);
-  until Token = CR;
+    if Token = CR then Fin();
+  until Token = '.';
 end.
