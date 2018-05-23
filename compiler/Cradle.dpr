@@ -17,6 +17,7 @@ const
 var
   Look: Char;          //Lookahead Character
   LCount: Integer;     //Label Counter
+  Token: string;
 
 
 {--------------------Basic Function-------------------------}
@@ -65,6 +66,12 @@ begin
   IsDigit := c in ['0'..'9'];
 end;
 
+{ Recognize an Alphanumeric Character }
+function IsAlNum(c: Char): Boolean;
+begin
+  IsAlNum := IsAlpha(c) or IsDigit(c);
+end;
+
 { Recognize an Addop }
 function IsAddop(c: Char): Boolean;
 begin
@@ -103,19 +110,31 @@ begin
 end;
 
 { Get an Identifier }
-function GetName: Char;
+function GetName: string;
+var
+  x: string[8];
 begin
+  x := '';
   if not IsAlpha(Look) then Expected('Name');
-  GetName := UpCase(Look);
-  GetChar();
+  while IsAlNum(Look) do begin
+    x := x + UpCase(Look);
+    GetChar();
+  end;
+  GetName := x;
 end;
 
 { Get a Number }
-function GetNum: Char;
+function GetNum: string;
+var
+  x: string[16];
 begin
+  x := '';
   if not IsDigit(Look) then Expected('Integer');
-  GetNum := Look;
-  GetChar();
+  while IsDigit(Look) do begin
+    x := x + Look;
+    GetChar();
+  end;
+  GetNum := x;
 end;
 
 { Get a Boolean Literal }
@@ -168,7 +187,7 @@ procedure Expression; forward;
 { Parse and Translate an Identifier }
 procedure Ident;
 var
-  Name: Char;
+  Name: string;
 begin
   Name := GetName();
   if Look = '(' then begin
@@ -395,6 +414,18 @@ end;
 
 procedure Block(L: string); forward;
 
+{ Parse and Translate an Assignment Statement }
+procedure Assignment;
+var
+  Name: string;
+begin
+  Name := GetName();
+  Match('=');
+  BoolExpression();
+  EmitLn('LEA ' + Name + '(PC),A0');
+  EmitLn('MOVE D0,(A0)');
+end;
+
 { Recognize and Translate an IF Construct }
 procedure DoIf(L: string);
 var
@@ -469,7 +500,7 @@ end;
 procedure DoFor;
 var
   L1, L2: string;
-  Name: Char;
+  Name: string;
 begin
   Match('f');
   L1 := NewLabel();
@@ -564,8 +595,26 @@ begin
   GetChar();
 end;
 
+{--------------------------Lexical Scanner----------------------}
+{ Lexical Scanner }
+function Scan: string;
+begin
+  if IsAlpha(Look) then
+    Scan := GetName()
+  else if IsDigit(Look) then
+    Scan := GetNum()
+  else begin
+    Scan := Look;
+    GetChar();
+  end;
+  SkipWhite();
+end;
+
 {-------------------------Main Program--------------------------}
 begin
   Init();
-  DoProgram();
+  repeat
+    Token := Scan;
+    Writeln(Token);
+  until Token = CR;
 end.
