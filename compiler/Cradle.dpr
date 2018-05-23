@@ -21,12 +21,13 @@ const
   LF = #10;
   KWList : array[1..4] of Symbol =
            ('IF', 'ELSE', 'ENDIF', 'END');
+  KWcode : string[5] = 'xilee';
 
 { Variable Declarations }
 var
   Look: Char;          //Lookahead Character
   LCount: Integer;     //Label Counter
-  Token: SymType;      //Current Token
+  Token: Char;         //Current Token
   Value: string[16];   //String Token of Look
 
 {--------------------Basic Function-------------------------}
@@ -138,8 +139,6 @@ end;
 
 { Get an Identifier }
 procedure GetName;
-var
-  k: Integer;
 begin
   Value := '';
   if not IsAlpha(Look) then Expected('Name');
@@ -147,11 +146,7 @@ begin
     Value := Value + UpCase(Look);
     GetChar();
   end;
-  k := Lookup(Addr(KWList), Value, 4);
-  if k = 0 then
-    Token := Ident
-  else
-    Token := SymType(k-1);
+  Token := KWcode[Lookup(Addr(KWlist), Value, 4) + 1];
 end;
 
 { Get a Number }
@@ -163,7 +158,7 @@ begin
     Value := Value + Look;
     GetChar();
   end;
-  Token := Number;
+  Token := '#';
 end;
 
 { Get an Operatort }
@@ -175,7 +170,10 @@ begin
     Value := Value + Look;
     GetChar();
   end;
-  Token := Operator;
+  if Length(Value) = 1 then
+    Token := Value[1]
+  else
+    Token := '?';
 end;
 
 { Get a Boolean Literal }
@@ -671,7 +669,7 @@ begin
     GetOp()
   else begin
     Value := Look;
-    Token := Operator;
+    Token := '?';
     GetChar();
   end;
   SkipWhite();
@@ -680,6 +678,7 @@ end;
 {-------------------------Main Program--------------------------}
 begin
   Init();
+  {
   repeat
     Scan();
     case Token of
@@ -690,4 +689,5 @@ begin
     end;
     Writeln(Value);
   until Token = EndSym;
+  }
 end.
