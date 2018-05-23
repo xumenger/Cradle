@@ -7,18 +7,25 @@ uses
   
 {----------------------Declaration----------------------------}
 
+{ Type Declarations }
+type
+  Symbol = string[8];
+  SymTab = array[1..1000] of Symbol;
+  TabPtr = ^SymTab;
+
 { Constant Declarations }
 const
   TAB = ^I;
   CR = #13;
   LF = #10;
+  KWList : array[1..4] of Symbol =
+           ('IF', 'ELSE', 'ENDIF', 'END');
 
 { Variable Declarations }
 var
   Look: Char;          //Lookahead Character
   LCount: Integer;     //Label Counter
   Token: string[16];
-
 
 {--------------------Basic Function-------------------------}
 { Read New Character From Input Stream}
@@ -624,6 +631,7 @@ begin
 end;
 
 {--------------------------Lexical Scanner----------------------}
+
 { Lexical Scanner }
 function Scan: string;
 begin
@@ -643,12 +651,25 @@ begin
   SkipWhite();
 end;
 
+{ Table Loopup
+If the input string matches a table entry, return the entry index. If not, return a zero }
+function Lookup(T: TabPtr; s: string; n: Integer): Integer;
+var
+  i: Integer;
+  found: Boolean;
+begin
+  found := False;
+  i := n;
+  while(i>0) and not found do
+    if s = T^[i] then
+      found := True
+    else
+      Dec(i);
+  Lookup := i;
+end;
+
 {-------------------------Main Program--------------------------}
 begin
-  Init();
-  repeat
-    Token := Scan;
-    Writeln(Token);
-    if Token = CR then Fin();
-  until Token = '.';
+  ReadLn(Token);
+  Writeln(Lookup(Addr(KWList), Token, 4));
 end.
