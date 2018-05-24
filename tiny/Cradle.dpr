@@ -143,83 +143,6 @@ begin
   InTable := ST[n] <> ' ';
 end;
 
-procedure Undefined(n: Char);
-begin
-  Abort('Duplicate Identifier ' + n);
-end;
-
-{-----------------------------------------------------------------}
-{ you can retarget the compiler to a new CPU simply by rewriting
-  the following 'code generator' procedures }
-
-{ Clear the Primary Register }
-procedure Clear;
-begin
-  EmitLn('CLR D0');
-end;
-
-{ Negate the Primary Register }
-procedure Negate;
-begin
-  EmitLn('NEG D0');
-end;
-
-{ Load a Constant Value to Primary Register }
-procedure LoadConst(n: Integer);
-begin
-  Emit('MOVE #');
-  Writeln(n, ',D0');
-end;
-
-{ Load a Variable to Primary Register }
-procedure LoadVar(Name: Char);
-begin
-  if not InTable(Name) then Undefined(Name);
-  EmitLn('MOVE ' + Name + '(PC),D0');
-end;
-
-{ Push Primary onto Stack }
-procedure Push;
-begin
-  EmitLn('MOVE D0,-(SP)');
-end;
-
-{ Add Top of Stack to Primary }
-procedure PopAdd;
-begin
-  EmitLn('ADD (SP)+,D0');
-end;
-
-{ Subtract Primary from Top Stack }
-procedure PopSub;
-begin
-  EmitLn('SUB (SP)+,D0');
-  EmitLn('NEG D0');
-end;
-
-{ Muliply Top of Stack by Primary }
-procedure PopMul;
-begin
-  EmitLn('MULS (SP)+,D0');
-end;
-
-{ Divide Top of Stack by Primary }
-procedure PopDiv;
-begin
-  EmitLn('MOVE (SP)+,D7');
-  EmitLn('EXT.L D7');
-  EmitLn('DIVS D0,D7');
-  EmitLn('MOVE D7,D0');
-end;
-
-{ Store Primary to Variable }
-procedure Store(Name: Char);
-begin
-  if not InTable(Name) then Undefined(Name);
-  EmitLn('LEA ' + Name + '(PC),A0');
-  EmitLn('MOVE D0,(A0)');
-end;
-
 {-----------------------------------------------------------------}
 
 { Write the Prolog }
@@ -244,7 +167,7 @@ end;
 { Allocate Storage for a Variable }
 procedure Alloc(N: Char);
 begin
-  if InTable(N) then Undefined(N);
+  if InTable(N) then Abort('Duplicate Variable Name ' + N);
   ST[N] := 'v';
   Write(N, ':', TAB, 'DC ');
   if Look = '=' then begin
