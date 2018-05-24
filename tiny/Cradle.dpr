@@ -87,11 +87,17 @@ begin
 end;
 
 { Get a Number }
-function GetNum: Char;
+function GetNum: Integer;
+var
+  Val: Integer;
 begin
+  Val := 0;
   if not IsDigit(Look) then Expected('Integer');
-  GetNum := Look;
-  GetChar;
+  while IsDigit(Look) do begin
+    Val := 10 * Val + Ord(Look) - Ord('0');
+    GetChar();
+  end;
+  GetNum := Val;
 end;
 
 { Match a Specific Input Character }
@@ -159,6 +165,12 @@ end;
 procedure Alloc(N: Char);
 begin
   Writeln(N, ':', TAB, 'DC 0');
+  if Look = '=' then begin
+    Match('=');
+    Writeln(GetNum());
+  end
+  else
+    Writeln('0');
 end;
 
 { Process a Data Declaration }
