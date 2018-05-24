@@ -291,6 +291,20 @@ begin
   EmitLn('EXT D0');
 end;
 
+
+{ Branch Unconditional }
+procedure Branch(L: string);
+begin
+  EmitLn('BRA ' + L);
+end;
+
+{ Branch False }
+procedure BranchFalse(L: string);
+begin
+  EmitLn('TST D0');
+  EmitLn('BEQ ' + L);
+end;
+
 {-----------------------------------------------------------------}
 
 { Parse and Translate a Math Factor }
@@ -332,8 +346,8 @@ begin
       end;
     '-':
       NegFactor();
-    else
-      Factor();
+  else
+    Factor();
   end;
 end;
 
@@ -528,6 +542,49 @@ end;
 
 {-----------------------------------------------------------------}
 
+{ Recognize and Translate an IF Construct }
+procedure Block; forward;
+
+procedure DoIf;
+var
+  L1, L2: string;
+begin
+  Match('i');
+  BoolExpression();
+  L1 := NewLabel();
+  L2 := L1;
+  BranchFalse(L1);
+  Block();
+  if Look = 'l' then begin
+    Match('l');
+    L2 := NewLabel();
+    Branch(L2);
+    PostLabel(L1);
+    Block();
+  end;
+  PostLabel(L2);
+  Match('e');
+end;
+
+{ Parse and Translate a WHILE Statement }
+procedure DoWhile;
+var
+  L1, L2: string;
+begin
+  Match('w');
+  L1 := NewLabel();
+  L2 := NewLabel();
+  PostLabel(L1);
+  BoolExpression();
+  BranchFalse(L2);
+  Block();
+  Match('e');
+  Branch(L1);
+  PostLabel(L2);
+end;
+
+{-----------------------------------------------------------------}
+
 { Write the Prolog }
 procedure Prolog;
 begin
@@ -590,8 +647,14 @@ end;
 { Parse and Translate a Block of Statement }
 procedure Block;
 begin
-  while Look <> 'e' do
-    Assignment();
+  while not (Look in ['e', 'l']) do begin
+    case Look of
+      'i': DoIf();
+      'w': DoWhile();
+    else
+      Assignment();
+    end;
+  end;
 end;
 
 { Parse and Translate a Main Program }
