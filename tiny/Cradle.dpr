@@ -14,12 +14,13 @@ const
   TAB = ^I;
   CR = ^M;
   LF = ^J;
-  NKW = 9;
-  NKW1 = 10;
+  NKW = 11;
+  NKW1 = 12;
   KWlist: array[1..NKW] of Symbol =
           ('IF', 'ELSE', 'ENDIF', 'WHILE', 'ENDWHILE',
+           'READ', 'WRITE',
            'VAR', 'BEGIN', 'END', 'PROGRAM');
-  KWcode: string[NKW1] = 'xilewevbep';
+  KWcode: string[NKW1] = 'xileweRWvbep';
   MaxEntry = 100;
 
 var
@@ -210,7 +211,7 @@ begin
   SType[NEntry] := T;
 end;
 
-procedure Undefined(n: Char);
+procedure Undefined(n: string);
 begin
   Abort('Duplicate Identifier ' + n);
 end;
@@ -280,7 +281,7 @@ begin
 end;
 
 { Store Primary to Variable }
-procedure Store(Name: Char);
+procedure Store(Name: string);
 begin
   if not InTable(Name) then Undefined(Name);
   EmitLn('LEA ' + Name + '(PC),A0');
@@ -372,6 +373,20 @@ procedure BranchFalse(L: string);
 begin
   EmitLn('TST D0');
   EmitLn('BEQ ' + L);
+end;
+
+
+{ Read Variable to Primary Register }
+procedure ReadVar;
+begin
+  EmitLn('BSR READ');
+  Store(Value);
+end;
+
+{ Write Variable from Primary Register }
+procedure WriteVar;
+begin
+  EmitLn('BSR WRITE');
 end;
 
 {-----------------------------------------------------------------}
@@ -674,6 +689,34 @@ begin
   PostLabel(L2);
 end;
 
+{ Process a Read Statement }
+procedure DoRead;
+begin
+  Match('(');
+  GetName();
+  ReadVar();
+  while Look = ',' do begin
+    Match(',');
+    GetName();
+    ReadVar();
+  end;
+  Match(')');
+end;
+
+{ Process a Write Statement }
+procedure DoWrite;
+begin
+  Match('(');
+  Expression();
+  WriteVar();
+  while Look = ',' do begin
+    Match(',');
+    Expression();
+    WriteVar();
+  end;
+  Match(')');
+end;
+
 {-----------------------------------------------------------------}
 
 { Table Lookup }
@@ -719,6 +762,7 @@ end;
 procedure Header;
 begin
   Writeln('WARMST', TAB, 'EQU $A01E');
+  EmitLn('LIB TINYLIB');
 end;
 
 { Allocate Storage for a Variable }
@@ -770,6 +814,8 @@ begin
     case Look of
       'i': DoIf();
       'w': DoWhile();
+      'R': DoRead();
+      'W': DoWrite();
     else
       Assignment();
     end;
