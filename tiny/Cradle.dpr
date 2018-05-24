@@ -5,15 +5,31 @@ program Cradle;
 uses
   SysUtils;
 
+type
+  Symbol = string[8];
+  SymTab = array[1..1000] of Symbol;
+  TabPtr = ^SymTab;
+
 const
   TAB = ^I;
   CR = ^M;
   LF = ^J;
+  NKW = 9;
+  NKW1 = 10;
+  KWlist: array[1..NKW] of Symbol =
+          ('IF', 'ELSE', 'ENDIF', 'WHILE', 'ENDWHILE',
+           'VAR', 'BEGIN', 'END', 'PROGRAM');
+  KWcode: string[NKW1] = 'xilewevbep';
+  MaxEntry = 100;
 
 var
-  Look: Char;
+  Look: Char;                    { Lookahead Character }
   LCount: Integer;
-  ST: array['A'..'Z'] of Char;
+  ST: array[1..MaxEntry] of Symbol;
+  SType: array[1..MaxEntry] of Symbol;
+  Token: Char;                   { Encoded Token       }
+  Value: string[16];             { Unencoded Token     }
+  NEntry: Integer = 0;
 
 {-----------------------------------------------------------------}
 
@@ -91,12 +107,34 @@ begin
   IsWhite := c in [' ', TAB];
 end;
 
-{ Get an Identifier }
-function GetName: Char;
+{ Skip Over Leading White Space }
+procedure SkipWhite;
 begin
+  while IsWhite(Look) do
+    GetChar();
+end;
+
+{ Skip Over an End-of-Line }
+procedure NewLine;
+begin
+  while Look = CR do begin
+    GetChar();
+    if Look = LF then GetChar();
+    SkipWhite();
+  end;
+end;
+
+{ Get an Identifier }
+procedure GetName;
+begin
+  NewLine();
   if not IsAlpha(Look) then Expected('Name');
-  GetName := UpCase(Look);
-  GetChar;
+  Value := '';
+  while IsAlNum(Look) do begin
+    Value := Value + UpCase(Look);
+    GetChar();
+  end;
+  SkipWhite();
 end;
 
 { Get a Number }
@@ -118,6 +156,12 @@ procedure Match(x: Char);
 begin
   if Look <> x then Expected('''' + x + '''');
   GetChar();
+end;
+
+{ Match a Specific Input String }
+procedure MatchString(x: string);
+begin
+  if Value <> x then Expected('''' + x + '''');
 end;
 
 { Generate a Unique Label }
@@ -150,9 +194,20 @@ begin
 end;
 
 { Look for Symbol in Table }
-function InTable(n: Char): Boolean;
+function Lookup(T: TabPtr; s: string; n: Integer): Integer; forward;
+function InTable(n: Symbol): Boolean;
 begin
-  InTable := ST[n] <> ' ';
+  InTable := Lookup(@ST, n, MaxEntry) <> 0;
+end;
+
+{ Add a New Entry to Symbol Table }
+procedure AddEntry(N: Symbol; T: Char);
+begin
+  if InTable(N) then Abort('Duplicate Identifier ' + N);
+  if NEntry = MaxEntry then Abort('Symbol Table Full');
+  Inc(NEntry);
+  ST[NEntry] := N;
+  SType[NEntry] := T;
 end;
 
 procedure Undefined(n: Char);
@@ -314,12 +369,13 @@ procedure Factor;
 begin
   if Look = '(' then begin
     Match('(');
-    Expression();
-    //BoolExpression();
+    BoolExpression();
     Match(')');
   end
-  else if IsAlpha(Look) then
-    LoadVar(GetName())
+  else if IsAlpha(Look) then begin
+    GetName();
+    LoadVar(Value[1]);
+  end
   else
     LoadConst(GetNum());
 end;
@@ -427,9 +483,9 @@ procedure Assignment;
 var
   Name: Char;
 begin
-  Name := GetName();
+  Name := Value[1];
   Match('=');
-  Expression();
+  BoolExpression();
   Store(Name);
 end;
 
@@ -549,21 +605,19 @@ procedure DoIf;
 var
   L1, L2: string;
 begin
-  Match('i');
   BoolExpression();
   L1 := NewLabel();
   L2 := L1;
   BranchFalse(L1);
   Block();
-  if Look = 'l' then begin
-    Match('l');
+  if Token = 'l' then begin
     L2 := NewLabel();
     Branch(L2);
     PostLabel(L1);
     Block();
   end;
   PostLabel(L2);
-  Match('e');
+  MatchString('ENDIF');
 end;
 
 { Parse and Translate a WHILE Statement }
@@ -571,16 +625,41 @@ procedure DoWhile;
 var
   L1, L2: string;
 begin
-  Match('w');
   L1 := NewLabel();
   L2 := NewLabel();
   PostLabel(L1);
   BoolExpression();
   BranchFalse(L2);
   Block();
-  Match('e');
+  MatchString('ENDWHILE');
   Branch(L1);
   PostLabel(L2);
+end;
+
+{-----------------------------------------------------------------}
+
+{ Table Lookup }
+function Lookup(T: TabPtr; s: string; n: Integer): Integer;
+var
+  i: Integer;
+  found: Boolean;
+begin
+  found := False;
+  i := n;
+  while (i > 0) and not found do begin
+    if s = T^[i] then
+      found := True
+    else
+      Dec(i);
+  end;
+  Lookup := i;
+end;
+
+{ Get an Identifier and Scan it for Keywords }
+procedure Scan;
+begin
+  GetName();
+  Token := KWcode[Lookup(Addr(KWlist), Value, NKW) + 1];
 end;
 
 {-----------------------------------------------------------------}
@@ -607,8 +686,8 @@ end;
 { Allocate Storage for a Variable }
 procedure Alloc(N: Char);
 begin
-  if InTable(N) then Undefined(N);
-  ST[N] := 'v';
+  if InTable(N) then Abort('Duplicate Variable Name ' + N);
+  AddEntry(N, 'v');
   Write(N, ':', TAB, 'DC ');
   if Look = '=' then begin
     Match('=');
@@ -625,11 +704,12 @@ end;
 { Process a Data Declaration }
 procedure Decl;
 begin
-  Match('v');
-  Alloc(GetName());
+  GetName();
+  Alloc(Value[1]);
   while Look = ',' do begin
-    GetChar();
-    Alloc(GetName());
+    Match(',');
+    GetName();
+    Alloc(Value[1]);
   end;
 end;
 
@@ -641,6 +721,7 @@ begin
       'v': Decl();
     else Abort('Unrecognize Keyword ''' + Look + '''');
     end;
+    Scan();
   end;
 end;
 
@@ -654,16 +735,17 @@ begin
     else
       Assignment();
     end;
+    Scan();
   end;
 end;
 
 { Parse and Translate a Main Program }
 procedure Main;
 begin
-  Match('b');
+  MatchString('BEGIN');
   Prolog();
   Block();
-  Match('e');
+  MatchString('END');
   Epilog();
 end;
 
@@ -672,11 +754,11 @@ end;
 { Parse and Translate a Program }
 procedure Prog;
 begin
-  Match('p');
+  MatchString('PROGRAM');
   Header();
   TopDecls();
   Main();
-  Match('.');
+  MatchString('.');
 end;
 
 { Initialize }
@@ -685,9 +767,12 @@ var
   i: Char;
 begin
   LCount := 0;
-  for i := 'A' to 'Z' do
+  for i := 1 to MaxEntry do begin
     ST[i] := ' ';
+    SType[i] := ' ';
+  end;
   GetChar();
+  Scan();
 end;
 
 {-----------------------------------------------------------------}
