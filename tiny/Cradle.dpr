@@ -14,6 +14,8 @@ var
   Look: Char;
   LCount: Integer;
 
+{-----------------------------------------------------------------}
+
 { Read New Character from Input Stream }
 procedure GetChar;
 begin
@@ -111,9 +113,13 @@ begin
   Emit(s);
   Writeln;
 end;
-  
+
+
+{-----------------------------------------------------------------}
+
 { Parse and Translate a Program }
 procedure Header; forward;
+procedure TopDecls; forward;
 procedure Main; forward;
 procedure Prolog; forward;
 procedure Epilog; forward;
@@ -122,6 +128,7 @@ procedure Prog;
 begin
   Match('p');
   Header();
+  TopDecls();
   Main();
   Match('.');
 end;
@@ -130,6 +137,24 @@ end;
 procedure Header;
 begin
   Writeln('WARMST', TAB, 'EQU $A01E');
+end;
+
+{ Process a Data Declaration }
+procedure Decl;
+begin
+  Match('v');
+  GetChar();
+end;
+
+{ Parse and Translate Global Declarations }
+procedure TopDecls;
+begin
+  while Look <> 'b' do begin
+    case Look of
+      'v': Decl();
+    else Abort('Unrecognize Keyword ''' + Look + '''');
+    end;
+  end;
 end;
 
 { Parse and Translate a Main Program }
@@ -160,6 +185,8 @@ begin
   LCount := 0;
   GetChar();
 end;
+
+{-----------------------------------------------------------------}
 
 { Main Program }
 begin
