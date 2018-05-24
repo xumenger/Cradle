@@ -143,6 +143,209 @@ begin
   InTable := ST[n] <> ' ';
 end;
 
+procedure Undefined(n: Char);
+begin
+  Abort('Duplicate Identifier ' + n);
+end;
+
+{-----------------------------------------------------------------}
+{ you can retarget the compiler to a new CPU simply by rewriting
+  the following 'code generator' procedures }
+
+{ Clear the Primary Register }
+procedure Clear;
+begin
+  EmitLn('CLR D0');
+end;
+
+{ Negate the Primary Register }
+procedure Negate;
+begin
+  EmitLn('NEG D0');
+end;
+
+{ Load a Constant Value to Primary Register }
+procedure LoadConst(n: Integer);
+begin
+  Emit('MOVE #');
+  Writeln(n, ',D0');
+end;
+
+{ Load a Variable to Primary Register }
+procedure LoadVar(Name: Char);
+begin
+  if not InTable(Name) then Undefined(Name);
+  EmitLn('MOVE ' + Name + '(PC),D0');
+end;
+
+{ Push Primary onto Stack }
+procedure Push;
+begin
+  EmitLn('MOVE D0,-(SP)');
+end;
+
+{ Add Top of Stack to Primary }
+procedure PopAdd;
+begin
+  EmitLn('ADD (SP)+,D0');
+end;
+
+{ Subtract Primary from Top Stack }
+procedure PopSub;
+begin
+  EmitLn('SUB (SP)+,D0');
+  EmitLn('NEG D0');
+end;
+
+{ Muliply Top of Stack by Primary }
+procedure PopMul;
+begin
+  EmitLn('MULS (SP)+,D0');
+end;
+
+{ Divide Top of Stack by Primary }
+procedure PopDiv;
+begin
+  EmitLn('MOVE (SP)+,D7');
+  EmitLn('EXT.L D7');
+  EmitLn('DIVS D0,D7');
+  EmitLn('MOVE D7,D0');
+end;
+
+{ Store Primary to Variable }
+procedure Store(Name: Char);
+begin
+  if not InTable(Name) then Undefined(Name);
+  EmitLn('LEA ' + Name + '(PC),A0');
+  EmitLn('MOVE D0,(A0)');
+end;
+
+{-----------------------------------------------------------------}
+
+{ Parse and Translate a Math Factor }
+procedure Expression; forward;
+procedure Factor;
+begin
+  if Look = '(' then begin
+    Match('(');
+    Expression();
+    Match(')');
+  end
+  else if IsAlpha(Look) then
+    LoadVar(GetName())
+  else
+    LoadConst(GetNum());
+end;
+
+{ Parse and Translate a Negative Factor }
+procedure NegFactor;
+begin
+  Match('-');
+  if IsDigit(Look) then
+    LoadConst(-GetNum())
+  else begin
+    Factor();
+    Negate();
+  end;
+end;
+
+{ Parse and Translate a Leading Factor }
+procedure FirstFactor;
+begin
+  case Look of
+    '+': begin
+      Match('+');
+      Factor();
+      end;
+    '-':
+      NegFactor();
+    else
+      Factor();
+  end;
+end;
+
+{ Recognize and Translate a Multiply }
+procedure Multiply;
+begin
+  Match('*');
+  Factor();
+  PopMul();
+end;
+
+{ Recognize and Translate a Divide }
+procedure Divide;
+begin
+  Match('/');
+  Factor();
+  PopDiv();
+end;
+
+{ Common Code Used by Term and FirstTerm }
+procedure Term1;
+begin
+  while IsMulop(Look) do begin
+    Push();
+    case Look of
+      '*': Multiply();
+      '/': Divide();
+    end;
+  end;
+end;
+
+{ Parse and Translate a Math Term }
+procedure Term;
+begin
+  Factor();
+  Term1();
+end;
+
+{ Parse and Translate a Leading Term }
+procedure FirstTerm;
+begin
+  FirstFactor();
+  Term1();
+end;
+
+{ Recognize and Translate an Add }
+procedure Add;
+begin
+  Match('+');
+  Term();
+  PopAdd();
+end;
+
+{ Recognize and Translate a Subtract }
+procedure Subtract;
+begin
+  Match('-');
+  Term();
+  PopSub();
+end;
+
+{ Parse and Translate an Expression }
+procedure Expression;
+begin
+  FirstTerm();
+  while IsAddop(Look) do begin
+    Push();
+    case Look of
+      '+': Add();
+      '-': Subtract();
+    end;
+  end;
+end;
+
+{ Parse and Translate an Assignment Statement }
+procedure Assignment;
+var
+  Name: Char;
+begin
+  Name := GetName();
+  Match('=');
+  Expression();
+  Store(Name);
+end;
+
 {-----------------------------------------------------------------}
 
 { Write the Prolog }
@@ -167,7 +370,7 @@ end;
 { Allocate Storage for a Variable }
 procedure Alloc(N: Char);
 begin
-  if InTable(N) then Abort('Duplicate Variable Name ' + N);
+  if InTable(N) then Undefined(N);
   ST[N] := 'v';
   Write(N, ':', TAB, 'DC ');
   if Look = '=' then begin
@@ -202,12 +405,6 @@ begin
     else Abort('Unrecognize Keyword ''' + Look + '''');
     end;
   end;
-end;
-
-{ Parse and Translate an Assignmnt Statement }
-procedure Assignment;
-begin
-  GetChar();
 end;
 
 { Parse and Translate a Block of Statement }
