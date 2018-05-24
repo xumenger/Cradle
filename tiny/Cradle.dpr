@@ -73,6 +73,18 @@ begin
   IsMulop := c in ['*', '/'];
 end;
 
+{ Recognize a Boolean Orop }
+function IsOrop(c: Char): Boolean;
+begin
+  IsOrop := c in ['|', '~'];
+end;
+
+{ Recognize a Relop }
+function IsRelop(c: Char): Boolean;
+begin
+  IsRelop := c in ['=', '#", '<', '>'];
+end;
+
 { Recognize White Space }
 function IsWhite(c: Char): Boolean;
 begin
@@ -220,6 +232,65 @@ begin
   EmitLn('MOVE D0,(A0)');
 end;
 
+
+{ Complement the Primary Register }
+procedure NotIt;
+begin
+  EmitLn('NOT D0');
+end;
+
+{ AND Top of Stack with Primary }
+procedure PopAnd;
+begin
+  EmitLn('AND (SP)+,D0');
+end;
+
+{ OR Top of Stack with Primary }
+procedure PopOr;
+begin
+  EmitLn('OR (SP)+,D0');
+end;
+
+{ XOR Top of Stack with Primary }
+procedure PopXor;
+begin
+  EmitLn('EOR (SP)+,D0');
+end;
+
+{ Compare Top of Stack with Primary }
+procedure PopCompare;
+begin
+  EmitLn('CMP (SP)+,D0');
+end;
+
+{ Set D0 If Compare was = }
+procedure SetEqual;
+begin
+  EmitLn('SEQ D0');
+  EmitLn('EXT D0');
+end;
+
+{ Set D0 If Compare was != }
+procedure SetNEqual;
+begin
+  EmitLn('SNE D0');
+  EmitLn('EXT D0');
+end;
+
+{ Set D0 If Compare was > }
+procedure SetGreater;
+begin
+  EmitLn('SLT D0');
+  EmitLn('EXT D0');
+end;
+
+{ Set D0 If Compare was < }
+procedure SetLess;
+begin
+  EmitLn('SGT D0');
+  EmitLn('EXT D0');
+end;
+
 {-----------------------------------------------------------------}
 
 { Parse and Translate a Math Factor }
@@ -345,6 +416,9 @@ begin
   Expression();
   Store(Name);
 end;
+
+{-----------------------------------------------------------------}
+
 
 {-----------------------------------------------------------------}
 
