@@ -163,9 +163,15 @@ end;
 
 { Process a Data Declaration }
 procedure Decl;
+var
+  Name: Char;
 begin
   Match('v');
   Alloc(GetName());
+  while Look = ',' do begin
+    GetChar();
+    Alloc(GetName());
+  end;
 end;
 
 { Parse and Translate Global Declarations }
