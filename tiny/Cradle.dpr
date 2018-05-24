@@ -82,7 +82,7 @@ end;
 { Recognize a Relop }
 function IsRelop(c: Char): Boolean;
 begin
-  IsRelop := c in ['=', '#", '<', '>'];
+  IsRelop := c in ['=', '#', '<', '>'];
 end;
 
 { Recognize White Space }
@@ -295,11 +295,13 @@ end;
 
 { Parse and Translate a Math Factor }
 procedure Expression; forward;
+procedure BoolExpression; forward;
 procedure Factor;
 begin
   if Look = '(' then begin
     Match('(');
     Expression();
+    //BoolExpression();
     Match(')');
   end
   else if IsAlpha(Look) then
@@ -419,6 +421,110 @@ end;
 
 {-----------------------------------------------------------------}
 
+{ Recognize and Translate a Relational "Equals" }
+procedure Equals;
+begin
+  Match('=');
+  Expression();
+  //BoolExpression();
+  PopCompare();
+  SetEqual();
+end;
+
+{ Recognize and Translate a Relational "Not Equals" }
+procedure NotEquals;
+begin
+  Match('#');
+  Expression();
+  PopCompare();
+  SetNEqual();
+end;
+
+{ Recognize and Translate a Relational "Less Than" }
+procedure Less;
+begin
+  Match('<');
+  Expression();
+  PopCompare();
+  SetLess();
+end;
+
+{ Recognize and Translate a Relational "Greater Than" }
+procedure Greater;
+begin
+  Match('>');
+  Expression();
+  PopCompare();
+  SetGreater();
+end;
+
+{ Parse and Translate a Relation }
+procedure Relation;
+begin
+  Expression();
+  if IsRelop(Look) then begin
+    Push();
+    case Look of
+      '=': Equals();
+      '#': NotEquals();
+      '<': Less();
+      '>': Greater();
+    end;
+  end;
+end;
+
+{ Parse and Translate a Boolean Factor with Leading NOT }
+procedure NotFactor;
+begin
+  if Look = '!' then begin
+    Match('!');
+    Relation();
+    NotIt();
+  end
+  else
+    Relation()
+end;
+
+{ Parse and Translate a Boolean Term }
+procedure BoolTerm;
+begin
+  NotFactor();
+  while Look = '&' do begin
+    Push();
+    Match('&');
+    NotFactor();
+    PopAnd();
+  end;
+end;
+
+{ Recognize and Translate a Boolean OR }
+procedure BoolOr;
+begin
+  Match('|');
+  BoolTerm();
+  PopOr();
+end;  
+
+{ Recognize and Translate an Exclusive Or }
+procedure BoolXor;
+begin
+  Match('~');
+  BoolTerm();
+  PopXor();
+end;
+
+{ Parse and Translate a Boolean Expression }
+procedure BoolExpression;
+begin
+  BoolTerm();
+  while IsOrop(Look) do begin
+    Push();
+    case Look of
+      '|': BoolOr();
+      '~': BoolXor();
+    end;
+  end;
+end;
 
 {-----------------------------------------------------------------}
 
