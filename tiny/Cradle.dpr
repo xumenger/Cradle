@@ -9,8 +9,8 @@ const
   TAB = ^I;
   
 { Parse and Translate a Program }
-{ <program> ::= PROGRAM <top-level decl> <main> '.' }
 procedure Header; forward;
+procedure Main; forward;
 procedure Prolog; forward;
 procedure Epilog; forward;
 
@@ -18,15 +18,23 @@ procedure Prog;
 begin
   Match('p');
   Header();
-  Prolog();
+  Main();
   Match('.');
-  Epilog();
 end;
 
 { Write Header Info }
 procedure Header;
 begin
   Writeln('WARMST', TAB, 'EQU $A01E');
+end;
+
+{ Parse and Translate a Main Program }
+procedure Main;
+begin
+  Match('b');
+  Prolog();
+  Match('e');
+  Epilog();
 end;
 
 { Write the Prolog }
