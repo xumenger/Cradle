@@ -346,6 +346,20 @@ begin
   EmitLn('EXT D0');
 end;
 
+{ Set D0 If Compare was <= }
+procedure SetLessOrEqual;
+begin
+  EmitLn('SEG D0');
+  EmitLn('EXT D0');
+end;
+
+{ Set D0 If Compare was >= }
+procedure SetGreaterOrEqual;
+begin
+  EmitLn('SLE D0');
+  EmitLn('EXT D0');
+end;
+
 
 { Branch Unconditional }
 procedure Branch(L: string);
@@ -492,7 +506,7 @@ end;
 {-----------------------------------------------------------------}
 
 { Recognize and Translate a Relational "Equals" }
-procedure Equals;
+procedure Equal;
 begin
   Match('=');
   Expression();
@@ -501,10 +515,19 @@ begin
   SetEqual();
 end;
 
-{ Recognize and Translate a Relational "Not Equals" }
-procedure NotEquals;
+{ Recognize and Translate a Relational "Less Than or Equal" }
+procedure LessOrEqual;
 begin
-  Match('#');
+  Match('=');
+  Expression();
+  PopCompare();
+  SetLessOrEqual();
+end;
+
+{ Recognize and Translate a Relational "Not Equals" }
+procedure NotEqual;
+begin
+  Match('>');
   Expression();
   PopCompare();
   SetNEqual();
@@ -514,18 +537,33 @@ end;
 procedure Less;
 begin
   Match('<');
-  Expression();
-  PopCompare();
-  SetLess();
+  case Look of
+    '=': LessOrEqual();
+    '>' : NotEqual();
+  else
+    begin
+      Expression();
+      PopCompare();
+      SetLess();
+    end;
+  end;
 end;
 
 { Recognize and Translate a Relational "Greater Than" }
 procedure Greater;
 begin
   Match('>');
-  Expression();
-  PopCompare();
-  SetGreater();
+  if Look = '=' then begin
+    Match('=');
+    Expression();
+    PopCompare();
+    SetGreaterOrEqual();
+  end
+  else begin
+    Expression();
+    PopCompare();
+    SetGreater();
+  end;
 end;
 
 { Parse and Translate a Relation }
@@ -535,8 +573,8 @@ begin
   if IsRelop(Look) then begin
     Push();
     case Look of
-      '=': Equals();
-      '#': NotEquals();
+      '=': Equal();
+      '#': NotEqual();
       '<': Less();
       '>': Greater();
     end;
@@ -764,7 +802,7 @@ end;
 { Initialize }
 procedure Init;
 var
-  i: Char;
+  i: Integer;
 begin
   LCount := 0;
   for i := 1 to MaxEntry do begin
