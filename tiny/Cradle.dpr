@@ -13,6 +13,7 @@ const
 var
   Look: Char;
   LCount: Integer;
+  ST: array['A'..'Z'] of Char;
 
 {-----------------------------------------------------------------}
 
@@ -136,6 +137,11 @@ begin
   Writeln;
 end;
 
+{ Look for Symbol in Table }
+function InTable(n: Char): Boolean;
+begin
+  InTable := ST[n] <> ' ';
+end;
 
 {-----------------------------------------------------------------}
 
@@ -164,13 +170,19 @@ end;
 { Allocate Storage for a Variable }
 procedure Alloc(N: Char);
 begin
-  Writeln(N, ':', TAB, 'DC 0');
+  if InTable(N) then Abort('Duplicate Variable Name ' + N);
+  ST[N] := 'v';
+  Write(N, ':', TAB, 'DC ');
   if Look = '=' then begin
     Match('=');
+    if Look = '-' then begin
+      Write(Look);
+      Match('-');
+    end;
     Writeln(GetNum());
   end
   else
-    Writeln('0');
+    WriteLn('0');
 end;
 
 { Process a Data Declaration }
@@ -221,8 +233,12 @@ end;
 
 { Initialize }
 procedure Init;
+var
+  i: Char;
 begin
   LCount := 0;
+  for i := 'A' to 'Z' do
+    ST[i] := ' ';
   GetChar();
 end;
 
