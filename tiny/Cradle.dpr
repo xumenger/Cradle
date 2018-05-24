@@ -78,6 +78,22 @@ begin
   IsWhite := c in [' ', TAB];
 end;
 
+{ Get an Identifier }
+function GetName: Char;
+begin
+  if not IsAlpha(Look) then Expected('Name');
+  GetName := UpCase(Look);
+  GetChar;
+end;
+
+{ Get a Number }
+function GetNum: Char;
+begin
+  if not IsDigit(Look) then Expected('Integer');
+  GetNum := Look;
+  GetChar;
+end;
+
 { Match a Specific Input Character }
 procedure Match(x: Char);
 begin
@@ -139,11 +155,17 @@ begin
   Writeln('WARMST', TAB, 'EQU $A01E');
 end;
 
+{ Allocate Storage for a Variable }
+procedure Alloc(N: Char);
+begin
+  Writeln(N, ':', TAB, 'DC 0');
+end;
+
 { Process a Data Declaration }
 procedure Decl;
 begin
   Match('v');
-  GetChar();
+  Alloc(GetName());
 end;
 
 { Parse and Translate Global Declarations }
