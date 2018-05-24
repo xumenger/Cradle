@@ -26,10 +26,10 @@ const
 var
   Look: Char;                    { Lookahead Character }
   LCount: Integer;
-  ST: array[1..MaxEntry] of Symbol;
-  SType: array[1..MaxEntry] of Symbol;
   Token: Char;                   { Encoded Token       }
   Value: string[16];             { Unencoded Token     }
+  ST: array[1..MaxEntry] of Symbol;
+  SType: array[1..MaxEntry] of Char;
   NEntry: Integer = 0;
 
 {-----------------------------------------------------------------}
@@ -58,6 +58,12 @@ end;
 procedure Expected(s: string);
 begin
   Abort(s + ' Expected');
+end;
+
+{ Report an Undefined Identifier }
+procedure Undefined(n: string);
+begin
+  Abort('Undefined Identifier ' + n);
 end;
 
 { Recognize an Alpha Character }
@@ -125,44 +131,17 @@ begin
   end;
 end;
 
-{ Get an Identifier }
-procedure GetName;
+{ Output a String with Tab }
+procedure Emit(s: string);
 begin
-  NewLine();
-  if not IsAlpha(Look) then Expected('Name');
-  Value := '';
-  while IsAlNum(Look) do begin
-    Value := Value + UpCase(Look);
-    GetChar();
-  end;
-  SkipWhite();
+  Write(TAB, s);
 end;
 
-{ Get a Number }
-function GetNum: Integer;
-var
-  Val: Integer;
+{ Output a String with Tab and CRLF }
+procedure EmitLn(s: string);
 begin
-  Val := 0;
-  if not IsDigit(Look) then Expected('Integer');
-  while IsDigit(Look) do begin
-    Val := 10 * Val + Ord(Look) - Ord('0');
-    GetChar();
-  end;
-  GetNum := Val;
-end;
-
-{ Match a Specific Input Character }
-procedure Match(x: Char);
-begin
-  if Look <> x then Expected('''' + x + '''');
-  GetChar();
-end;
-
-{ Match a Specific Input String }
-procedure MatchString(x: string);
-begin
-  if Value <> x then Expected('''' + x + '''');
+  Emit(s);
+  Writeln;
 end;
 
 { Generate a Unique Label }
@@ -181,21 +160,33 @@ begin
   Writeln(L, ':');
 end;
 
-{ Output a String with Tab }
-procedure Emit(s: string);
+{-----------------------------------------------------------------}
+
+{ Table Lookup }
+function Lookup(T: TabPtr; s: string; n: Integer): Integer;
+var
+  i: Integer;
+  found: Boolean;
 begin
-  Write(Tab, s);
+  found := False;
+  i := n;
+  while (i > 0) and not found do begin
+    if s = T^[i] then
+      found := True
+    else
+      Dec(i);
+  end;
+  Lookup := i;
 end;
 
-{ Output a String with Tab and CRLF }
-procedure EmitLn(s: string);
+{ Locate a Symbol in Table}
+{ Return the Index of the Entry, Zero if not present }
+function Locate(N: Symbol): Integer;
 begin
-  Emit(s);
-  Writeln;
+  Locate := Lookup(@ST, n, MaxEntry);
 end;
 
 { Look for Symbol in Table }
-function Lookup(T: TabPtr; s: string; n: Integer): Integer; forward;
 function InTable(n: Symbol): Boolean;
 begin
   InTable := Lookup(@ST, n, MaxEntry) <> 0;
@@ -211,9 +202,55 @@ begin
   SType[NEntry] := T;
 end;
 
-procedure Undefined(n: string);
+{ Get an Identifier }
+procedure GetName;
 begin
-  Abort('Duplicate Identifier ' + n);
+  NewLine();
+  if not IsAlpha(Look) then Expected('Name');
+  Value := '';
+  while IsAlNum(Look) do begin
+    Value := Value + UpCase(Look);
+    GetChar();
+  end;
+  SkipWhite();
+end;
+
+{ Get a Number }
+function GetNum: Integer;
+var
+  Val: Integer;
+begin
+  NewLine();
+  if not IsDigit(Look) then Expected('Integer'); 
+  Val := 0;
+  while IsDigit(Look) do begin
+    Val := 10 * Val + Ord(Look) - Ord('0');
+    GetChar();
+  end;
+  GetNum := Val;
+  SkipWhite();
+end;
+
+{ Get an Identifier and Scan it for Keywords }
+procedure Scan;
+begin
+  GetName();
+  Token := KWcode[Lookup(Addr(KWlist), Value, NKW) + 1];
+end;
+
+{ Match a Specific Input Character }
+procedure Match(x: Char);
+begin
+  NewLine();
+  if Look = x then GetChar()
+  else Expected('''' + x + '''');
+  SkipWhite();
+end;
+
+{ Match a Specific Input String }
+procedure MatchString(x: string);
+begin
+  if Value <> x then Expected('''' + x + '''');
 end;
 
 {-----------------------------------------------------------------}
@@ -240,7 +277,7 @@ begin
 end;
 
 { Load a Variable to Primary Register }
-procedure LoadVar(Name: Char);
+procedure LoadVar(Name: string);
 begin
   if not InTable(Name) then Undefined(Name);
   EmitLn('MOVE ' + Name + '(PC),D0');
@@ -350,7 +387,7 @@ end;
 { Set D0 If Compare was <= }
 procedure SetLessOrEqual;
 begin
-  EmitLn('SEG D0');
+  EmitLn('SGE D0');
   EmitLn('EXT D0');
 end;
 
@@ -392,7 +429,6 @@ end;
 {-----------------------------------------------------------------}
 
 { Parse and Translate a Math Factor }
-procedure Expression; forward;
 procedure BoolExpression; forward;
 procedure Factor;
 begin
@@ -403,7 +439,7 @@ begin
   end
   else if IsAlpha(Look) then begin
     GetName();
-    LoadVar(Value[1]);
+    LoadVar(Value);
   end
   else
     LoadConst(GetNum());
@@ -425,9 +461,10 @@ end;
 procedure FirstFactor;
 begin
   case Look of
-    '+': begin
-      Match('+');
-      Factor();
+    '+':
+      begin
+        Match('+');
+        Factor();
       end;
     '-':
       NegFactor();
@@ -510,9 +547,9 @@ end;
 { Parse and Translate an Assignment Statement }
 procedure Assignment;
 var
-  Name: Char;
+  Name: string;
 begin
-  Name := Value[1];
+  Name := Value;
   Match('=');
   BoolExpression();
   Store(Name);
@@ -525,7 +562,6 @@ procedure Equal;
 begin
   Match('=');
   Expression();
-  //BoolExpression();
   PopCompare();
   SetEqual();
 end;
@@ -589,7 +625,6 @@ begin
     Push();
     case Look of
       '=': Equal();
-      '#': NotEqual();
       '<': Less();
       '>': Greater();
     end;
@@ -717,33 +752,31 @@ begin
   Match(')');
 end;
 
-{-----------------------------------------------------------------}
-
-{ Table Lookup }
-function Lookup(T: TabPtr; s: string; n: Integer): Integer;
-var
-  i: Integer;
-  found: Boolean;
+{ Parse and Translate a Block of Statement }
+procedure Block;
 begin
-  found := False;
-  i := n;
-  while (i > 0) and not found do begin
-    if s = T^[i] then
-      found := True
+  Scan();
+  while not (Token in ['e', 'l']) do begin
+    case Token of
+      'i': DoIf();
+      'w': DoWhile();
+      'R': DoRead();
+      'W': DoWrite();
     else
-      Dec(i);
+      Assignment();
+    end;
+    Scan();
   end;
-  Lookup := i;
-end;
-
-{ Get an Identifier and Scan it for Keywords }
-procedure Scan;
-begin
-  GetName();
-  Token := KWcode[Lookup(Addr(KWlist), Value, NKW) + 1];
 end;
 
 {-----------------------------------------------------------------}
+
+{ Write Header Info }
+procedure Header;
+begin
+  Writeln('WARMST', TAB, 'EQU $A01E');
+  //EmitLn('LIB TINYLIB');
+end;
 
 { Write the Prolog }
 procedure Prolog;
@@ -758,15 +791,8 @@ begin
   EmitLn('END MAIN');
 end;
 
-{ Write Header Info }
-procedure Header;
-begin
-  Writeln('WARMST', TAB, 'EQU $A01E');
-  EmitLn('LIB TINYLIB');
-end;
-
 { Allocate Storage for a Variable }
-procedure Alloc(N: Char);
+procedure Alloc(N: Symbol);
 begin
   if InTable(N) then Abort('Duplicate Variable Name ' + N);
   AddEntry(N, 'v');
@@ -787,37 +813,22 @@ end;
 procedure Decl;
 begin
   GetName();
-  Alloc(Value[1]);
+  Alloc(Value);
   while Look = ',' do begin
     Match(',');
     GetName();
-    Alloc(Value[1]);
+    Alloc(Value);
   end;
 end;
 
 { Parse and Translate Global Declarations }
 procedure TopDecls;
 begin
-  while Look <> 'b' do begin
-    case Look of
+  Scan();
+  while Token <> 'b' do begin
+    case Token of
       'v': Decl();
     else Abort('Unrecognize Keyword ''' + Look + '''');
-    end;
-    Scan();
-  end;
-end;
-
-{ Parse and Translate a Block of Statement }
-procedure Block;
-begin
-  while not (Look in ['e', 'l']) do begin
-    case Look of
-      'i': DoIf();
-      'w': DoWhile();
-      'R': DoRead();
-      'W': DoWrite();
-    else
-      Assignment();
     end;
     Scan();
   end;
@@ -842,7 +853,7 @@ begin
   Header();
   TopDecls();
   Main();
-  MatchString('.');
+  Match('.');
 end;
 
 { Initialize }
@@ -852,7 +863,7 @@ var
 begin
   LCount := 0;
   for i := 1 to MaxEntry do begin
-    ST[i] := ' ';
+    ST[i] := '';
     SType[i] := ' ';
   end;
   GetChar();
