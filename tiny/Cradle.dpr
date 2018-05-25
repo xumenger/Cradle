@@ -14,18 +14,17 @@ const
   TAB = ^I;
   CR = ^M;
   LF = ^J;
-  NKW = 11;
-  NKW1 = 12;
+  NKW = 9;
+  NKW1 = 10;
   KWlist: array[1..NKW] of Symbol =
           ('IF', 'ELSE', 'ENDIF', 'WHILE', 'ENDWHILE',
-           'READ', 'WRITE',
-           'VAR', 'BEGIN', 'END', 'PROGRAM');
-  KWcode: string[NKW1] = 'xileweRWvbep';
+           'READ', 'WRITE', 'VAR', 'END');
+  KWcode: string[NKW1] = 'xileweRWve';
   MaxEntry = 100;
 
 var
   Look: Char;                    { Lookahead Character }
-  LCount: Integer;
+  LCount: Integer = 0;
   Token: Char;                   { Encoded Token       }
   Value: string[16];             { Unencoded Token     }
   ST: array[1..MaxEntry] of Symbol;
@@ -64,6 +63,18 @@ end;
 procedure Undefined(n: string);
 begin
   Abort('Undefined Identifier ' + n);
+end;
+
+{ Report a Duplicate Identifier }
+procedure Duplicate(n: string);
+begin
+  Abort('Duplicate Identifier ' + n);
+end;
+
+{ Check to Make Sure the Current Token is an Identifier }
+procedure CheckIdent;
+begin
+  if Token <> 'x' then Expected('Identifier');
 end;
 
 { Recognize an Alpha Character }
@@ -111,7 +122,7 @@ end;
 { Recognize White Space }
 function IsWhite(c: Char): Boolean;
 begin
-  IsWhite := c in [' ', TAB];
+  IsWhite := c in [' ', TAB, CR, LF];
 end;
 
 { Skip Over Leading White Space }
@@ -121,15 +132,6 @@ begin
     GetChar();
 end;
 
-{ Skip Over an End-of-Line }
-procedure NewLine;
-begin
-  while Look = CR do begin
-    GetChar();
-    if Look = LF then GetChar();
-    SkipWhite();
-  end;
-end;
 
 { Output a String with Tab }
 procedure Emit(s: string);
@@ -183,19 +185,33 @@ end;
 { Return the Index of the Entry, Zero if not present }
 function Locate(N: Symbol): Integer;
 begin
-  Locate := Lookup(@ST, n, MaxEntry);
+  Locate := Lookup(@ST, n, NEntry);
 end;
 
 { Look for Symbol in Table }
 function InTable(n: Symbol): Boolean;
 begin
-  InTable := Lookup(@ST, n, MaxEntry) <> 0;
+  InTable := Lookup(@ST, n, NEntry) <> 0;
+end;
+
+{ Check to See if an Identifier is in the Symbol Table }
+{ Report an error if it's not }
+procedure CheckTable(N: Symbol);
+begin
+  if not InTable(N) then Undefined(N);
+end;
+
+{ Check the Symbol Table for a Duplicate Identifier }
+{ Report an Error if Identifier is already in Table }
+procedure CheckDup(N: Symbol);
+begin
+  if InTable(N) then Duplicate(N);
 end;
 
 { Add a New Entry to Symbol Table }
 procedure AddEntry(N: Symbol; T: Char);
 begin
-  if InTable(N) then Abort('Duplicate Identifier ' + N);
+  CheckDup(N);
   if NEntry = MaxEntry then Abort('Symbol Table Full');
   Inc(NEntry);
   ST[NEntry] := N;
@@ -205,52 +221,59 @@ end;
 { Get an Identifier }
 procedure GetName;
 begin
-  NewLine();
-  if not IsAlpha(Look) then Expected('Name');
+  SkipWhite();
+  if not IsAlpha(Look) then Expected('Identifier');
+  Token := 'x';
   Value := '';
-  while IsAlNum(Look) do begin
+  repeat
     Value := Value + UpCase(Look);
     GetChar();
-  end;
-  SkipWhite();
+  until not IsAlNum(Look);
 end;
 
 { Get a Number }
-function GetNum: Integer;
-var
-  Val: Integer;
+procedure GetNum;
 begin
-  NewLine();
-  if not IsDigit(Look) then Expected('Integer'); 
-  Val := 0;
-  while IsDigit(Look) do begin
-    Val := 10 * Val + Ord(Look) - Ord('0');
-    GetChar();
-  end;
-  GetNum := Val;
   SkipWhite();
+  if not IsDigit(Look) then Expected('Integer');
+  Token := '#';
+  Value := '';
+  repeat
+    Value := Value + Look;
+    GetChar();
+  until not IsDigit(Look);
+end;
+
+{ Get an Operator }
+procedure GetOp;
+begin
+  SkipWhite();
+  Token := Look;
+  Value := Look;
+  GetChar();
+end;
+
+{ Get the Next Input Token }
+procedure Next;
+begin
+  SkipWhite();
+  if IsAlpha(Look) then GetName()
+  else if IsDigit(Look) then GetNum()
+  else GetOp()
 end;
 
 { Get an Identifier and Scan it for Keywords }
 procedure Scan;
 begin
-  GetName();
-  Token := KWcode[Lookup(Addr(KWlist), Value, NKW) + 1];
-end;
-
-{ Match a Specific Input Character }
-procedure Match(x: Char);
-begin
-  NewLine();
-  if Look = x then GetChar()
-  else Expected('''' + x + '''');
-  SkipWhite();
+  if Token = 'x' then
+    Token := KWcode[Lookup(Addr(KWlist), Value, NKW) + 1];
 end;
 
 { Match a Specific Input String }
 procedure MatchString(x: string);
 begin
   if Value <> x then Expected('''' + x + '''');
+  Next();
 end;
 
 {-----------------------------------------------------------------}
@@ -270,7 +293,7 @@ begin
 end;
 
 { Load a Constant Value to Primary Register }
-procedure LoadConst(n: Integer);
+procedure LoadConst(n: string);
 begin
   Emit('MOVE #');
   Writeln(n, ',D0');
@@ -320,7 +343,6 @@ end;
 { Store Primary to Variable }
 procedure Store(Name: string);
 begin
-  if not InTable(Name) then Undefined(Name);
   EmitLn('LEA ' + Name + '(PC),A0');
   EmitLn('MOVE D0,(A0)');
 end;
@@ -414,69 +436,71 @@ end;
 
 
 { Read Variable to Primary Register }
-procedure ReadVar;
+procedure ReadIt(Name: string);
 begin
   EmitLn('BSR READ');
-  Store(Value);
+  Store(Name);
 end;
 
 { Write Variable from Primary Register }
-procedure WriteVar;
+procedure WriteIt;
 begin
   EmitLn('BSR WRITE');
+end;
+
+
+{ Write Header Info }
+procedure Header;
+begin
+  Writeln('WARMST', TAB, 'EQU $A01E');
+end;
+
+{ Write the Prolog }
+procedure Prolog;
+begin
+  PostLabel('MAIN');
+end;
+
+{ Write the Epilog }
+procedure Epilog;
+begin
+  EmitLn('DC WARMST');
+  EmitLn('END MAIN');
+end;
+
+{ Allocate Storage for a Variable }
+procedure Allocate(Name, Val: Symbol);
+begin
+  Writeln(Name, ':', TAB, 'DC ', Val);
 end;
 
 {-----------------------------------------------------------------}
 
 { Parse and Translate a Math Factor }
 procedure BoolExpression; forward;
+procedure Expression; forward;
 procedure Factor;
 begin
   if Look = '(' then begin
-    Match('(');
+    Next();
     BoolExpression();
-    Match(')');
+    MatchString(')');
   end
-  else if IsAlpha(Look) then begin
-    GetName();
-    LoadVar(Value);
-  end
-  else
-    LoadConst(GetNum());
-end;
-
-{ Parse and Translate a Negative Factor }
-procedure NegFactor;
-begin
-  Match('-');
-  if IsDigit(Look) then
-    LoadConst(-GetNum())
   else begin
-    Factor();
-    Negate();
-  end;
-end;
-
-{ Parse and Translate a Leading Factor }
-procedure FirstFactor;
-begin
-  case Look of
-    '+':
-      begin
-        Match('+');
-        Factor();
-      end;
-    '-':
-      NegFactor();
-  else
-    Factor();
+    if Token = 'x' then
+      LoadVar(Value)
+    else if Token = '#' then
+      LoadConst(Value)
+    else
+      Expected('Math Factor');
+    Next();
   end;
 end;
 
 { Recognize and Translate a Multiply }
 procedure Multiply;
 begin
-  Match('*');
+  Next();
   Factor();
   PopMul();
 end;
@@ -484,41 +508,28 @@ end;
 { Recognize and Translate a Divide }
 procedure Divide;
 begin
-  Match('/');
+  Next();
   Factor();
   PopDiv();
-end;
-
-{ Common Code Used by Term and FirstTerm }
-procedure Term1;
-begin
-  while IsMulop(Look) do begin
-    Push();
-    case Look of
-      '*': Multiply();
-      '/': Divide();
-    end;
-  end;
 end;
 
 { Parse and Translate a Math Term }
 procedure Term;
 begin
   Factor();
-  Term1();
-end;
-
-{ Parse and Translate a Leading Term }
-procedure FirstTerm;
-begin
-  FirstFactor();
-  Term1();
+  while IsMulop(Token) do begin
+    Push();
+    case Token of
+      '*': Multiply();
+      '/': Divide();
+    end;
+  end;
 end;
 
 { Recognize and Translate an Add }
 procedure Add;
 begin
-  Match('+');
+  Next();
   Term();
   PopAdd();
 end;
@@ -526,18 +537,35 @@ end;
 { Recognize and Translate a Subtract }
 procedure Subtract;
 begin
-  Match('-');
+  Next();
   Term();
   PopSub();
+end;
+
+{ Get Another Expression and Compare }
+procedure CompareExpression;
+begin
+  Expression();
+  PopCompare();
+end;
+
+{ Get The Next Expression and Compare }
+procedure NextExpression;
+begin
+  Next();
+  CompareExpression();
 end;
 
 { Parse and Translate an Expression }
 procedure Expression;
 begin
-  FirstTerm();
-  while IsAddop(Look) do begin
+  if IsAddop(Token) then
+    Clear()
+  else
+    Term();
+  while IsAddop(Token) do begin
     Push();
-    case Look of
+    case Token of
       '+': Add();
       '-': Subtract();
     end;
@@ -549,8 +577,10 @@ procedure Assignment;
 var
   Name: string;
 begin
+  CheckTable(Value);
   Name := Value;
-  Match('=');
+  Next();
+  MatchString('=');
   BoolExpression();
   Store(Name);
 end;
@@ -560,41 +590,34 @@ end;
 { Recognize and Translate a Relational "Equals" }
 procedure Equal;
 begin
-  Match('=');
-  Expression();
-  PopCompare();
+  NextExpression();
   SetEqual();
 end;
 
 { Recognize and Translate a Relational "Less Than or Equal" }
 procedure LessOrEqual;
 begin
-  Match('=');
-  Expression();
-  PopCompare();
+  NextExpression();
   SetLessOrEqual();
 end;
 
 { Recognize and Translate a Relational "Not Equals" }
 procedure NotEqual;
 begin
-  Match('>');
-  Expression();
-  PopCompare();
+  NextExpression();
   SetNEqual();
 end;
 
 { Recognize and Translate a Relational "Less Than" }
 procedure Less;
 begin
-  Match('<');
-  case Look of
+  Next();
+  case Token of
     '=': LessOrEqual();
-    '>' : NotEqual();
+    '>': NotEqual();
   else
     begin
-      Expression();
-      PopCompare();
+      CompareExpression();
       SetLess();
     end;
   end;
@@ -603,16 +626,13 @@ end;
 { Recognize and Translate a Relational "Greater Than" }
 procedure Greater;
 begin
-  Match('>');
-  if Look = '=' then begin
-    Match('=');
-    Expression();
-    PopCompare();
+  Next();
+  if Token = '=' then begin
+    NextExpression();
     SetGreaterOrEqual();
   end
   else begin
-    Expression();
-    PopCompare();
+    CompareExpression();
     SetGreater();
   end;
 end;
@@ -635,7 +655,7 @@ end;
 procedure NotFactor;
 begin
   if Look = '!' then begin
-    Match('!');
+    Next();
     Relation();
     NotIt();
   end
@@ -649,7 +669,7 @@ begin
   NotFactor();
   while Look = '&' do begin
     Push();
-    Match('&');
+    Next();
     NotFactor();
     PopAnd();
   end;
@@ -658,7 +678,7 @@ end;
 { Recognize and Translate a Boolean OR }
 procedure BoolOr;
 begin
-  Match('|');
+  Next();
   BoolTerm();
   PopOr();
 end;  
@@ -666,7 +686,7 @@ end;
 { Recognize and Translate an Exclusive Or }
 procedure BoolXor;
 begin
-  Match('~');
+  Next();
   BoolTerm();
   PopXor();
 end;
@@ -693,12 +713,14 @@ procedure DoIf;
 var
   L1, L2: string;
 begin
+  Next();
   BoolExpression();
   L1 := NewLabel();
   L2 := L1;
   BranchFalse(L1);
   Block();
   if Token = 'l' then begin
+    Next();
     L2 := NewLabel();
     Branch(L2);
     PostLabel(L1);
@@ -713,6 +735,7 @@ procedure DoWhile;
 var
   L1, L2: string;
 begin
+  Next();
   L1 := NewLabel();
   L2 := NewLabel();
   PostLabel(L1);
@@ -724,32 +747,41 @@ begin
   PostLabel(L2);
 end;
 
+{ Read a Single Variable }
+procedure ReadVar;
+begin
+  CheckIdent();
+  CheckTable(Value);
+  ReadIt(Value);
+  Next();
+end;
+
 { Process a Read Statement }
 procedure DoRead;
 begin
-  Match('(');
-  GetName();
+  Next();
+  MatchString('(');
   ReadVar();
   while Look = ',' do begin
-    Match(',');
-    GetName();
+    Next();
     ReadVar();
   end;
-  Match(')');
+  MatchString(')');
 end;
 
 { Process a Write Statement }
 procedure DoWrite;
 begin
-  Match('(');
+  Next();
+  MatchString('(');
   Expression();
-  WriteVar();
-  while Look = ',' do begin
-    Match(',');
+  WriteIt();
+  while Token = ',' do begin
+    Next();
     Expression();
-    WriteVar();
+    WriteIt();
   end;
-  Match(')');
+  MatchString(')');
 end;
 
 { Parse and Translate a Block of Statement }
@@ -771,103 +803,36 @@ end;
 
 {-----------------------------------------------------------------}
 
-{ Write Header Info }
-procedure Header;
-begin
-  Writeln('WARMST', TAB, 'EQU $A01E');
-  //EmitLn('LIB TINYLIB');
-end;
-
-{ Write the Prolog }
-procedure Prolog;
-begin
-  PostLabel('MAIN');
-end;
-
-{ Write the Epilog }
-procedure Epilog;
-begin
-  EmitLn('DC WARMST');
-  EmitLn('END MAIN');
-end;
-
 { Allocate Storage for a Variable }
-procedure Alloc(N: Symbol);
+procedure Alloc;
 begin
-  if InTable(N) then Abort('Duplicate Variable Name ' + N);
-  AddEntry(N, 'v');
-  Write(N, ':', TAB, 'DC ');
-  if Look = '=' then begin
-    Match('=');
-    if Look = '-' then begin
-      Write(Look);
-      Match('-');
-    end;
-    Writeln(GetNum());
-  end
-  else
-    WriteLn('0');
-end;
-
-{ Process a Data Declaration }
-procedure Decl;
-begin
-  GetName();
-  Alloc(Value);
-  while Look = ',' do begin
-    Match(',');
-    GetName();
-    Alloc(Value);
-  end;
+  Next();
+  if Token <> 'x' then Expected('Variable Name');
+  CheckDup(Value);
+  AddEntry(Value, 'v');
+  Allocate(Value, '0');
+  Next();
 end;
 
 { Parse and Translate Global Declarations }
 procedure TopDecls;
 begin
   Scan();
-  while Token <> 'b' do begin
-    case Token of
-      'v': Decl();
-    else Abort('Unrecognize Keyword ''' + Look + '''');
+  while Token = 'v' do
+  begin
+    Alloc();
+    while Token = ',' do
+    begin
+      Alloc();
     end;
-    Scan();
   end;
-end;
-
-{ Parse and Translate a Main Program }
-procedure Main;
-begin
-  MatchString('BEGIN');
-  Prolog();
-  Block();
-  MatchString('END');
-  Epilog();
-end;
-
-{-----------------------------------------------------------------}
-
-{ Parse and Translate a Program }
-procedure Prog;
-begin
-  MatchString('PROGRAM');
-  Header();
-  TopDecls();
-  Main();
-  Match('.');
 end;
 
 { Initialize }
 procedure Init;
-var
-  i: Integer;
 begin
-  LCount := 0;
-  for i := 1 to MaxEntry do begin
-    ST[i] := '';
-    SType[i] := ' ';
-  end;
   GetChar();
-  Scan();
+  Next();
 end;
 
 {-----------------------------------------------------------------}
@@ -875,7 +840,13 @@ end;
 { Main Program }
 begin
   Init();
-  Prog();
-  if Look <> CR then Abort('Unexpected data after ''.''')
+  MatchString('PROGRAM');
+  Header();
+  TopDecls();
+  MatchString('BEGIN');
+  Prolog();
+  Block();
+  MatchString('END');
+  Epilog();
 end.
 
